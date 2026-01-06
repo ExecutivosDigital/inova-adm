@@ -1,31 +1,32 @@
 @import "tailwindcss";
 
 @theme {
-  /* Changing the default fontFamily to Poppins */
-  --font-sans: "Poppins", sans-serif;
+  /* Primary Color */
+  --color-primary: #ed6842;
+  --color-primary-foreground: #ffffff;
 
-  /* --color-primary: #ed6842; */
+  /* Background & Foreground */
+  --color-background: #ffffff;
+  --color-foreground: #0f172a;
 
-  /* --animate-accordion-up: accordion-up 0.2s ease-out;
-  --animate-accordion-down: accordion-down 0.2s ease-out;
+  /* Muted */
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
 
-  @keyframes accordion-up {
-    from {
-      height: var(--radix-accordion-content-height);
-    }
-    to {
-      height: 0;
-    }
-  }
+  /* Card */
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
 
-  @keyframes accordion-down {
-    from {
-      height: 0;
-    }
-    to {
-      height: var(--radix-accordion-content-height);
-    }
-  } */
+  /* Popover */
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+
+  /* Border */
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+
+  /* Ring */
+  --color-ring: #ed6842;
 }
 
 .swiper-slide {
