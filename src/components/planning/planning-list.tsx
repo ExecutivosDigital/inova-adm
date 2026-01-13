@@ -103,10 +103,10 @@ const typeMap = {
 
 export function PlanningList() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div className="rounded-lg border border-slate-100 bg-white shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-slate-100 hover:bg-transparent">
             <TableHead>OS</TableHead>
             <TableHead>Equipamento</TableHead>
             <TableHead>Serviço</TableHead>
@@ -121,8 +121,11 @@ export function PlanningList() {
         </TableHeader>
         <TableBody>
           {orders.map((order) => (
-            <TableRow key={order.id}>
-              <TableCell className="font-medium text-slate-900">
+            <TableRow
+              key={order.id}
+              className="border-slate-100 hover:bg-slate-50/50"
+            >
+              <TableCell className="font-medium text-slate-700">
                 {order.id}
               </TableCell>
               <TableCell>
@@ -130,13 +133,13 @@ export function PlanningList() {
                   href={`/equipamentos/${order.equipmentId}`}
                   className="group"
                 >
-                  <p className="group-hover:text-primary font-medium text-slate-900 transition-colors">
+                  <p className="group-hover:text-primary font-medium text-slate-700 transition-colors">
                     {order.equipment}
                   </p>
                   <p className="text-sm text-slate-500">TAG: {order.tag}</p>
                 </Link>
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {order.service}
               </TableCell>
               <TableCell>
@@ -144,13 +147,13 @@ export function PlanningList() {
                   {order.type}
                 </Badge>
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {new Date(order.scheduledDate).toLocaleDateString("pt-BR")}
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {order.estimatedTime}
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {order.technician}
               </TableCell>
               <TableCell>
@@ -165,13 +168,13 @@ export function PlanningList() {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <button className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50">
+                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                     <Eye className="h-4 w-4" />
                   </button>
-                  <button className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50">
+                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50 hover:text-red-600">
+                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

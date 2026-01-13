@@ -76,10 +76,10 @@ const statusMap = {
 
 export function TeamTable() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div className="rounded-lg border border-slate-100 bg-white shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-slate-100 hover:bg-transparent">
             <TableHead>Membro</TableHead>
             <TableHead>Departamento</TableHead>
             <TableHead>Especialidades</TableHead>
@@ -90,19 +90,22 @@ export function TeamTable() {
         </TableHeader>
         <TableBody>
           {team.map((member) => (
-            <TableRow key={member.id}>
+            <TableRow
+              key={member.id}
+              className="border-slate-100 hover:bg-slate-50/50"
+            >
               <TableCell>
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/20 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold">
                     {member.avatar}
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">{member.name}</p>
+                    <p className="font-medium text-slate-700">{member.name}</p>
                     <p className="text-sm text-slate-500">{member.role}</p>
                   </div>
                 </div>
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {member.department}
               </TableCell>
               <TableCell>
@@ -115,7 +118,7 @@ export function TeamTable() {
                 </div>
               </TableCell>
               <TableCell>
-                <div className="space-y-1 text-xs text-slate-600">
+                <div className="space-y-1 text-xs text-slate-500">
                   <div className="flex items-center gap-1">
                     <Mail className="h-3 w-3" />
                     <span>{member.email}</span>
@@ -133,10 +136,10 @@ export function TeamTable() {
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  <button className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50">
+                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                     <Eye className="h-4 w-4" />
                   </button>
-                  <button className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50">
+                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                     <Pencil className="h-4 w-4" />
                   </button>
                 </div>

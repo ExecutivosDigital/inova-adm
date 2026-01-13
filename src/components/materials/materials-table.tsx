@@ -85,10 +85,10 @@ function getStockStatus(current: number, min: number, max: number) {
 
 export function MaterialsTable() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div className="rounded-lg border border-slate-100 bg-white shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-slate-100 hover:bg-transparent">
             <TableHead>Material</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead>Estoque</TableHead>
@@ -103,22 +103,25 @@ export function MaterialsTable() {
             const percentage = Math.min((item.current / item.max) * 100, 100);
 
             return (
-              <TableRow key={item.id}>
+              <TableRow
+                key={item.id}
+                className="border-slate-100 hover:bg-slate-50/50"
+              >
                 <TableCell>
                   <div>
-                    <p className="font-medium text-slate-900">{item.name}</p>
+                    <p className="font-medium text-slate-700">{item.name}</p>
                     <p className="text-sm text-slate-500">
                       SKU: {item.sku} • {item.manufacturer}
                     </p>
                   </div>
                 </TableCell>
-                <TableCell className="text-sm text-slate-600">
+                <TableCell className="text-sm text-slate-500">
                   {item.type}
                 </TableCell>
                 <TableCell>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-900">
+                      <span className="text-sm font-medium text-slate-700">
                         {item.current} {item.unit}
                       </span>
                       <span className="text-xs text-slate-400">
@@ -141,18 +144,18 @@ export function MaterialsTable() {
                     {status.label}
                   </span>
                 </TableCell>
-                <TableCell className="text-sm font-medium text-slate-900">
+                <TableCell className="text-sm font-medium text-slate-700">
                   {item.value}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Link
                       href={`/materiais/${item.id}`}
-                      className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50"
+                      className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                     >
                       <Eye className="h-4 w-4" />
                     </Link>
-                    <button className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50">
+                    <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                       <Pencil className="h-4 w-4" />
                     </button>
                   </div>

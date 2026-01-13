@@ -74,10 +74,10 @@ const criticalityMap = {
 
 export function EquipmentTable() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div className="rounded-lg border border-slate-100 bg-white shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="border-slate-100 hover:bg-transparent">
             <TableHead className="w-20">Foto</TableHead>
             <TableHead>TAG/Nome</TableHead>
             <TableHead>Modelo</TableHead>
@@ -90,25 +90,28 @@ export function EquipmentTable() {
         </TableHeader>
         <TableBody>
           {equipment.map((item) => (
-            <TableRow key={item.id}>
+            <TableRow
+              key={item.id}
+              className="border-slate-100 hover:bg-slate-50/50"
+            >
               <TableCell>
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
                   <span className="text-xs text-slate-400">IMG</span>
                 </div>
               </TableCell>
               <TableCell>
                 <div>
-                  <p className="font-medium text-slate-900">{item.tag}</p>
+                  <p className="font-medium text-slate-700">{item.tag}</p>
                   <p className="text-sm text-slate-500">{item.name}</p>
                 </div>
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {item.model}
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {item.sector}
               </TableCell>
-              <TableCell className="text-sm text-slate-600">
+              <TableCell className="text-sm text-slate-500">
                 {new Date(item.nextIntervention).toLocaleDateString("pt-BR")}
               </TableCell>
               <TableCell>
@@ -125,11 +128,11 @@ export function EquipmentTable() {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/equipamentos/${item.id}`}
-                    className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50"
+                    className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                   >
                     <Eye className="h-4 w-4" />
                   </Link>
-                  <button className="hover:text-primary rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-50">
+                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
                     <Pencil className="h-4 w-4" />
                   </button>
                 </div>
