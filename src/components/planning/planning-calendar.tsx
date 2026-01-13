@@ -5,8 +5,20 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+type Priority = "alta" | "media" | "baixa";
+
+interface Event {
+  id: string;
+  equipment: string;
+  equipmentId: string;
+  service: string;
+  type: string;
+  date: string;
+  priority: Priority;
+}
+
 // Mock data - ordens agendadas
-const events = [
+const events: Event[] = [
   {
     id: "OS-001",
     equipment: "Moenda 01",

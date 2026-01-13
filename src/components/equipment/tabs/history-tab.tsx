@@ -1,7 +1,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User } from "lucide-react";
 
-const history = [
+type HistoryType = "Preventiva" | "Preditiva" | "Corretiva";
+
+interface HistoryItem {
+  id: string;
+  date: string;
+  type: HistoryType;
+  description: string;
+  technician: string;
+  photo: string | null;
+  status: string;
+}
+
+const history: HistoryItem[] = [
   {
     id: "1",
     date: "2025-01-10",

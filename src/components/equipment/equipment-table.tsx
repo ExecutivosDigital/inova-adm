@@ -12,8 +12,23 @@ import {
 import { Eye, Pencil } from "lucide-react";
 import Link from "next/link";
 
+type EquipmentStatus = "operacional" | "manutencao" | "parado";
+type Criticality = "alta" | "media" | "baixa";
+
+interface Equipment {
+  id: string;
+  photo: string;
+  tag: string;
+  name: string;
+  model: string;
+  sector: string;
+  nextIntervention: string;
+  status: EquipmentStatus;
+  criticality: Criticality;
+}
+
 // Mock data
-const equipment = [
+const equipment: Equipment[] = [
   {
     id: "1",
     photo: "/placeholder.jpg",

@@ -5,8 +5,33 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+type CipStatus = "em-dia" | "atrasado" | "proximo";
+
+interface CIP {
+  id: string;
+  name: string;
+  service: string;
+  frequency: string;
+  status: CipStatus;
+  material: string;
+  materialId: string;
+  volume: string;
+}
+
+interface Subset {
+  id: string;
+  name: string;
+  cips: CIP[];
+}
+
+interface Structure {
+  id: string;
+  name: string;
+  subsets: Subset[];
+}
+
 // Mock hierarchical data
-const structure = [
+const structure: Structure[] = [
   {
     id: "conjunto-a",
     name: "Conjunto A (Motor)",

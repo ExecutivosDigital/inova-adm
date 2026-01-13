@@ -2,7 +2,19 @@ import { Badge } from "@/components/ui/badge";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 
-const linkedAssets = [
+type Criticality = "alta" | "media" | "baixa";
+
+interface LinkedAsset {
+  id: string;
+  tag: string;
+  name: string;
+  sector: string;
+  cip: string;
+  consumption: string;
+  criticality: Criticality;
+}
+
+const linkedAssets: LinkedAsset[] = [
   {
     id: "1",
     tag: "MOE-001",

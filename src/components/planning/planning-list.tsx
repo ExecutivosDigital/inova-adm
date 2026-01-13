@@ -12,8 +12,26 @@ import {
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 
+type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+type Priority = "alta" | "media" | "baixa";
+type TaskType = "Preventiva" | "Preditiva" | "Corretiva" | "Inspeção";
+
+interface Order {
+  id: string;
+  equipment: string;
+  equipmentId: string;
+  tag: string;
+  service: string;
+  type: TaskType;
+  status: TaskStatus;
+  technician: string;
+  scheduledDate: string;
+  estimatedTime: string;
+  priority: Priority;
+}
+
 // Mock data - mesmas ordens do Kanban
-const orders = [
+const orders: Order[] = [
   {
     id: "OS-001",
     equipment: "Moenda 01",

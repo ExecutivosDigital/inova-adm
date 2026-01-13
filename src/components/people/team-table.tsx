@@ -9,8 +9,22 @@ import {
 } from "@/components/ui/table";
 import { Eye, Mail, Pencil, Phone } from "lucide-react";
 
+type MemberStatus = "ativo" | "ferias" | "afastado";
+
+interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  email: string;
+  phone: string;
+  status: MemberStatus;
+  specialties: string[];
+  avatar: string;
+}
+
 // Mock data - Equipe
-const team = [
+const team: TeamMember[] = [
   {
     id: "1",
     name: "João Silva",

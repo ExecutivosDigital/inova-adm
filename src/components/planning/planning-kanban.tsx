@@ -6,8 +6,30 @@ import { AlertCircle, Calendar, Clock, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+type Priority = "alta" | "media" | "baixa";
+
+interface Technician {
+  name: string;
+  avatar: string;
+}
+
+interface Task {
+  id: string;
+  equipment: string;
+  equipmentId: string;
+  tag: string;
+  service: string;
+  type: string;
+  status: TaskStatus;
+  technician: Technician;
+  scheduledDate: string;
+  estimatedTime: string;
+  priority: Priority;
+}
+
 // Mock data - Ordens de Serviço
-const tasks = [
+const tasks: Task[] = [
   {
     id: "1",
     equipment: "Moenda 01",
