@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import axios from "axios";
-import { useCookies } from "next-client-cookies";
 import { createContext, useContext } from "react";
+import { useAuth } from "./AuthContext";
 
 const baseURL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -34,9 +34,7 @@ interface ProviderProps {
 }
 
 export const ApiContextProvider = ({ children }: ProviderProps) => {
-  const cookies = useCookies();
-
-  const token = cookies.get(process.env.NEXT_PUBLIC_USER_TOKEN as string);
+  const { token } = useAuth();
 
   const api = axios.create({
     baseURL,
@@ -45,7 +43,7 @@ export const ApiContextProvider = ({ children }: ProviderProps) => {
   function config(auth: boolean) {
     return {
       headers: {
-        Authorization: auth ? `Bearer ${token}` : "",
+        Authorization: auth && token ? `Bearer ${token}` : "",
         "ngrok-skip-browser-warning": "any",
       },
     };
