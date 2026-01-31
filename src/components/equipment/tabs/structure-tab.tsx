@@ -1,104 +1,12 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import type { EquipmentFromApi, SetFromApi } from "@/lib/equipment-types";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 
-type CipStatus = "em-dia" | "atrasado" | "proximo";
-
-interface CIP {
-  id: string;
-  name: string;
-  service: string;
-  frequency: string;
-  status: CipStatus;
-  material: string;
-  materialId: string;
-  volume: string;
+interface StructureTabProps {
+  equipment: EquipmentFromApi | null;
 }
-
-interface Subset {
-  id: string;
-  name: string;
-  cips: CIP[];
-}
-
-interface Structure {
-  id: string;
-  name: string;
-  subsets: Subset[];
-}
-
-// Mock hierarchical data
-const structure: Structure[] = [
-  {
-    id: "conjunto-a",
-    name: "Conjunto A (Motor)",
-    subsets: [
-      {
-        id: "sub-a1",
-        name: "Subconjunto A.1 (Mancal Dianteiro)",
-        cips: [
-          {
-            id: "cip-01",
-            name: "CIP 01 (Ponto de Graxa)",
-            service: "Reaplicação de Graxa",
-            frequency: "Semanal",
-            status: "em-dia",
-            material: "Graxa Shell Gadus S2 V220",
-            materialId: "1",
-            volume: "20g",
-          },
-        ],
-      },
-      {
-        id: "sub-a2",
-        name: "Subconjunto A.2 (Mancal Traseiro)",
-        cips: [
-          {
-            id: "cip-02",
-            name: "CIP 02 (Ponto de Graxa)",
-            service: "Reaplicação de Graxa",
-            frequency: "Semanal",
-            status: "atrasado",
-            material: "Graxa Shell Gadus S2 V220",
-            materialId: "1",
-            volume: "20g",
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: "conjunto-b",
-    name: "Conjunto B (Redutor)",
-    subsets: [
-      {
-        id: "sub-b1",
-        name: "Subconjunto B.1 (Cárter)",
-        cips: [
-          {
-            id: "cip-03",
-            name: "CIP 03 (Troca de Óleo)",
-            service: "Troca de Óleo",
-            frequency: "Semestral",
-            status: "em-dia",
-            material: "Mobilgear 600 XP 68",
-            materialId: "2",
-            volume: "45L",
-          },
-        ],
-      },
-    ],
-  },
-];
-
-const statusMap = {
-  "em-dia": { label: "Em dia", variant: "success" as const },
-  atrasado: { label: "Atrasado", variant: "destructive" as const },
-  proximo: { label: "Próximo", variant: "warning" as const },
-};
 
 function AccordionItem({
   title,
@@ -114,6 +22,7 @@ function AccordionItem({
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex w-full items-center gap-2 bg-slate-50 p-4 text-left transition-colors hover:bg-slate-100"
       >
@@ -129,7 +38,30 @@ function AccordionItem({
   );
 }
 
-export function StructureTab() {
+export function StructureTab({ equipment }: StructureTabProps) {
+  if (!equipment) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-6">
+        <p className="text-slate-500">Nenhum dado disponível.</p>
+      </div>
+    );
+  }
+
+  const sets: SetFromApi[] = equipment.sets ?? [];
+
+  if (sets.length === 0) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-6">
+        <h3 className="mb-4 text-lg font-semibold text-slate-900">
+          Estrutura Hierárquica & Serviços
+        </h3>
+        <p className="text-slate-500">
+          Nenhum conjunto cadastrado para este equipamento.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 bg-white p-6">
@@ -141,61 +73,51 @@ export function StructureTab() {
         </p>
 
         <div className="space-y-3">
-          {structure.map((conjunto) => (
-            <AccordionItem key={conjunto.id} title={conjunto.name}>
+          {sets.map((setItem) => (
+            <AccordionItem key={setItem.id} title={`${setItem.code} — ${setItem.name}`}>
               <div className="space-y-2 pl-4">
-                {conjunto.subsets.map((subset) => (
-                  <AccordionItem key={subset.id} title={subset.name}>
+                {(setItem.subsets ?? []).map((subset) => (
+                  <AccordionItem key={subset.id} title={`${subset.code} — ${subset.name}`}>
                     <div className="space-y-3 pl-4">
-                      {subset.cips.map((cip) => (
+                      {(subset.cips ?? []).map((cip) => (
                         <div
                           key={cip.id}
                           className="rounded-lg border border-slate-100 bg-slate-50 p-4"
                         >
-                          <div className="mb-3 flex items-start justify-between">
-                            <h5 className="font-medium text-slate-900">
-                              📍 {cip.name}
-                            </h5>
-                            <Badge variant={statusMap[cip.status].variant}>
-                              {statusMap[cip.status].label}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+                          <h5 className="mb-2 font-medium text-slate-900">
+                            {cip.code} — {cip.name}
+                          </h5>
+                          <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
                             <div>
-                              <span className="text-slate-500">Serviço: </span>
+                              <span className="text-slate-500">Posição: </span>
                               <span className="text-slate-900">
-                                {cip.service}
+                                {cip.position ?? "—"}
                               </span>
                             </div>
-                            <div>
-                              <span className="text-slate-500">
-                                Frequência:{" "}
-                              </span>
-                              <span className="text-slate-900">
-                                {cip.frequency}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-slate-500">Material: </span>
-                              <Link
-                                href={`/materiais/${cip.materialId}`}
-                                className="text-primary font-medium hover:underline"
-                              >
-                                {cip.material}
-                              </Link>
-                            </div>
-                            <div>
-                              <span className="text-slate-500">Volume: </span>
-                              <span className="text-slate-900">
-                                {cip.volume}
-                              </span>
-                            </div>
+                            {cip.cipServices && (cip.cipServices as unknown[]).length > 0 && (
+                              <div>
+                                <span className="text-slate-500">Serviços: </span>
+                                <span className="text-slate-900">
+                                  {(cip.cipServices as unknown[]).length} vinculado(s)
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
+                      {(subset.cips ?? []).length === 0 && (
+                        <p className="text-sm text-slate-500">
+                          Nenhum CIP neste subconjunto.
+                        </p>
+                      )}
                     </div>
                   </AccordionItem>
                 ))}
+                {(setItem.subsets ?? []).length === 0 && (
+                  <p className="text-sm text-slate-500">
+                    Nenhum subconjunto neste conjunto.
+                  </p>
+                )}
               </div>
             </AccordionItem>
           ))}

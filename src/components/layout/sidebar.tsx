@@ -6,33 +6,50 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAdminProfile } from "@/hooks/useAdminProfile";
+import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import {
   CalendarDays,
   ChevronLeft,
   LayoutDashboard,
+  Lock,
+  LogOut,
   Menu,
   Package,
+  Route,
   Settings,
   Users,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Visão Geral", href: "/" },
-  { icon: Wrench, label: "Equipamentos", href: "/equipamentos" },
-  { icon: Package, label: "Materiais", href: "/materiais" },
-  { icon: CalendarDays, label: "Planejamento", href: "/planejamento" },
-  { icon: Users, label: "Pessoas", href: "/pessoas" },
-  { icon: Settings, label: "Configurações", href: "/configuracoes" },
+  { icon: LayoutDashboard, label: "Visão Geral", href: "/", enabled: false },
+  { icon: Wrench, label: "Equipamentos", href: "/equipamentos", enabled: true },
+  { icon: Package, label: "Materiais", href: "/materiais", enabled: false },
+  { icon: Route, label: "Planejamento", href: "/planejamento", enabled: true },
+  { icon: CalendarDays, label: "Programação", href: "/programacao", enabled: false },
+  { icon: Users, label: "Pessoas", href: "/pessoas", enabled: false },
+  { icon: Settings, label: "Configurações", href: "/configuracoes", enabled: false },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const { signOut } = useAuth();
+  const { profile, loading, initials, roleLabel } = useAdminProfile();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    setUserMenuOpen(false);
+    signOut();
+    router.push("/login");
+  };
 
   return (
     <aside
@@ -64,51 +81,99 @@ export function Sidebar() {
       <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-6">
         <TooltipProvider>
           {menuItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href && item.enabled;
+            const isDisabled = !item.enabled;
+            const enabledLinkClass = cn(
+              "group relative flex items-center rounded-xl transition-all duration-200",
+              isActive
+                ? "bg-primary text-primary-foreground shadow-md font-medium"
+                : "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
+            );
+            const disabledLinkClass = cn(
+              "group relative flex items-center rounded-xl transition-all duration-200",
+              "cursor-not-allowed pointer-events-none",
+              "bg-slate-50/80 text-slate-400 border border-slate-100",
+            );
+            const iconClass = cn(
+              "h-5 w-5 shrink-0",
+              isActive
+                ? "text-primary-foreground"
+                : isDisabled
+                  ? "text-slate-400"
+                  : "text-slate-500 group-hover:text-slate-700",
+            );
+            const content = (
+              <>
+                <item.icon className={iconClass} />
+                {!isCollapsed && (
+                  <span className={cn("text-sm", isActive && "font-medium")}>
+                    {item.label}
+                  </span>
+                )}
+              </>
+            );
             return (
               <div key={item.href}>
                 {isCollapsed ? (
                   <Tooltip delayDuration={0}>
                     <TooltipTrigger asChild>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "group relative flex items-center justify-center rounded-xl p-3 transition-all duration-200",
-                          isActive
-                            ? "bg-primary text-primary-foreground shadow-md"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-                        )}
-                      >
-                        <item.icon className="h-6 w-6" />
-                      </Link>
+                      {item.enabled ? (
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            enabledLinkClass,
+                            "justify-center p-3",
+                          )}
+                        >
+                          <item.icon
+                            className={cn(
+                              "h-6 w-6",
+                              isActive
+                                ? "text-primary-foreground"
+                                : "text-slate-600",
+                            )}
+                          />
+                        </Link>
+                      ) : (
+                        <span
+                          className={cn(
+                            disabledLinkClass,
+                            "justify-center p-3",
+                          )}
+                          aria-disabled="true"
+                        >
+                          <Lock className="h-5 w-5 text-slate-400" />
+                        </span>
+                      )}
                     </TooltipTrigger>
                     <TooltipContent
                       side="right"
                       className="border-0 bg-slate-900 text-white"
                     >
                       {item.label}
+                      {isDisabled && (
+                        <span className="ml-1.5 text-slate-300">
+                          (indisponível)
+                        </span>
+                      )}
                     </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "group relative flex items-center gap-3 rounded-xl px-4 py-3 transition-all duration-200",
-                      isActive
-                        ? "bg-primary text-primary-foreground font-medium shadow-md"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-                    )}
-                  >
-                    <item.icon
-                      className={cn(
-                        "h-5 w-5",
-                        isActive
-                          ? "text-primary-foreground"
-                          : "text-slate-400 group-hover:text-slate-600",
-                      )}
-                    />
-                    <span className="text-sm">{item.label}</span>
-                  </Link>
+                  item.enabled ? (
+                    <Link
+                      href={item.href}
+                      className={cn(enabledLinkClass, "gap-3 px-4 py-3")}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <span
+                      className={cn(disabledLinkClass, "gap-3 px-4 py-3")}
+                      aria-disabled="true"
+                    >
+                      {content}
+                    </span>
+                  )
                 )}
               </div>
             );
@@ -116,26 +181,60 @@ export function Sidebar() {
         </TooltipProvider>
       </nav>
 
-      {/* Footer / User Profile (Minimized) */}
+      {/* Footer / User Profile + Logout */}
       <div className="border-t border-slate-100 p-4">
         <div
+          ref={userMenuRef}
           className={cn(
-            "flex items-center gap-3",
+            "relative flex items-center gap-3",
             isCollapsed && "justify-center",
           )}
         >
-          <div className="bg-primary/20 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold">
-            JD
-          </div>
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((open) => !open)}
+            className="focus:ring-primary/20 flex shrink-0 rounded-full outline-none focus:ring-2 focus:ring-offset-2"
+            aria-expanded={userMenuOpen}
+            aria-haspopup="true"
+            aria-label="Abrir menu do usuário"
+          >
+            <div className="bg-primary/20 text-primary flex h-10 w-10 items-center justify-center rounded-full font-bold ring-2 ring-transparent transition-shadow hover:ring-slate-200">
+              {loading ? "…" : initials}
+            </div>
+          </button>
           {!isCollapsed && (
-            <div className="overflow-hidden">
+            <div className="min-w-0 flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium text-slate-900">
-                João da Silva
+                {loading ? "Carregando..." : profile?.name ?? "Admin"}
               </p>
               <p className="truncate text-xs text-slate-500">
-                Gerente de Manutenção
+                {roleLabel}
               </p>
             </div>
+          )}
+
+          {userMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                aria-hidden="true"
+                onClick={() => setUserMenuOpen(false)}
+              />
+              <div
+                className="absolute bottom-full left-0 right-0 z-50 mb-2 min-w-[120px] rounded-lg border border-slate-200 bg-white py-1 shadow-md"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="hover:bg-slate-50 flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700"
+                  role="menuitem"
+                >
+                  <LogOut className="h-4 w-4 text-slate-500" />
+                  Sair
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

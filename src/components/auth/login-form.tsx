@@ -110,7 +110,7 @@ export default function LoginForm() {
 
         await signIn(accessToken);
         reset();
-        router.push("/");
+        router.push("/planejamento");
       } else {
         setError(
           response.body?.message || "Erro ao fazer login. Verifique suas credenciais.",

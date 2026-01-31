@@ -8,11 +8,18 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Bell, Search } from "lucide-react";
-import { usePathname } from "next/navigation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useCompany } from "@/context/CompanyContext";
+import { Building2, Loader2 } from "lucide-react";
 import React from "react";
+import { usePathname } from "next/navigation";
 
-// Helper to generate breadcrumbs from path
 function generateBreadcrumbs(pathname: string) {
   const paths = pathname.split("/").filter((x) => x);
   const breadcrumbs = paths.map((path, index) => {
@@ -27,11 +34,18 @@ function generateBreadcrumbs(pathname: string) {
 export function TopBar() {
   const pathname = usePathname();
   const breadcrumbs = generateBreadcrumbs(pathname);
+  const {
+    companies,
+    selectedCompanyId,
+    setSelectedCompanyId,
+    isSuperAdmin,
+    loading: companiesLoading,
+  } = useCompany();
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
       {/* Breadcrumbs */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <Breadcrumb>
           <BreadcrumbList>
             {breadcrumbs.map((crumb, index) => (
@@ -57,24 +71,31 @@ export function TopBar() {
         </Breadcrumb>
       </div>
 
-      {/* Right Actions */}
-      <div className="flex items-center gap-4">
-        {/* Global Search */}
-        <div className="group relative hidden md:block">
-          <Search className="group-focus-within:text-primary absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors" />
-          <input
-            type="text"
-            placeholder="Buscar por TAG ou SKU..."
-            className="focus:border-primary/50 focus:ring-primary/10 w-64 rounded-full border border-transparent bg-slate-50 py-2 pr-4 pl-10 text-sm transition-all outline-none focus:bg-white focus:ring-4"
-          />
+      {/* Company dropdown (Super Admin only) */}
+      {isSuperAdmin && (
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-slate-400" />
+          {companiesLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+          ) : (
+            <Select
+              value={selectedCompanyId ?? ""}
+              onValueChange={(value) => setSelectedCompanyId(value || null)}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Selecione a empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.corporateName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
-
-        {/* Notifications */}
-        <button className="hover:text-primary relative rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1.5 right-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500"></span>
-        </button>
-      </div>
+      )}
     </header>
   );
 }

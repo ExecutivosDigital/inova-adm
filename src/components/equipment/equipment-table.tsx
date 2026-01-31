@@ -9,151 +9,162 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Pencil } from "lucide-react";
+import {
+  criticalityMap,
+  type CriticalityApi,
+  type EquipmentFromApi,
+} from "@/lib/equipment-types";
+import { Eye, Loader2, Pencil } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
-type EquipmentStatus = "operacional" | "manutencao" | "parado";
-type Criticality = "alta" | "media" | "baixa";
-
-interface Equipment {
-  id: string;
-  photo: string;
-  tag: string;
-  name: string;
-  model: string;
-  sector: string;
-  nextIntervention: string;
-  status: EquipmentStatus;
-  criticality: Criticality;
+interface EquipmentTableProps {
+  equipments: EquipmentFromApi[];
+  loading: boolean;
+  error: string | null;
+  search: string;
+  criticalityFilter: string;
+  sectorFilter: string;
 }
 
-// Mock data
-const equipment: Equipment[] = [
-  {
-    id: "1",
-    photo: "/placeholder.jpg",
-    tag: "MOE-001",
-    name: "Moenda 01",
-    model: "Redutor Flender H4SH18",
-    sector: "Moagem",
-    nextIntervention: "2025-02-15",
-    status: "operacional",
-    criticality: "alta",
-  },
-  {
-    id: "2",
-    photo: "/placeholder.jpg",
-    tag: "MOT-045",
-    name: "Motor Exaustor 3",
-    model: "WEG W22 500HP",
-    sector: "Ensaque",
-    nextIntervention: "2025-01-20",
-    status: "manutencao",
-    criticality: "media",
-  },
-  {
-    id: "3",
-    photo: "/placeholder.jpg",
-    tag: "HID-007",
-    name: "Unidade Hidráulica Central",
-    model: "Bosch Rexroth A10VSO",
-    sector: "Utilidades",
-    nextIntervention: "2025-03-10",
-    status: "operacional",
-    criticality: "alta",
-  },
-  {
-    id: "4",
-    photo: "/placeholder.jpg",
-    tag: "VEN-012",
-    name: "Ventilador Industrial",
-    model: "TGM FAN-1200",
-    sector: "Armazenagem",
-    nextIntervention: "2025-01-28",
-    status: "parado",
-    criticality: "baixa",
-  },
-];
+function getCriticalityVariant(
+  c: CriticalityApi | null
+): "high" | "medium" | "low" {
+  if (!c) return "low";
+  return criticalityMap[c]?.variant ?? "low";
+}
 
-const statusMap = {
-  operacional: { label: "Operacional", variant: "success" as const },
-  parado: { label: "Parado", variant: "destructive" as const },
-  manutencao: { label: "Em Manutenção", variant: "warning" as const },
-};
+function getCriticalityLabel(c: CriticalityApi | null): string {
+  if (!c) return "—";
+  return criticalityMap[c]?.label ?? c;
+}
 
-const criticalityMap = {
-  alta: { label: "Alta", variant: "high" as const },
-  media: { label: "Média", variant: "medium" as const },
-  baixa: { label: "Baixa", variant: "low" as const },
-};
+export function EquipmentTable({
+  equipments,
+  loading,
+  error,
+  search,
+  criticalityFilter,
+  sectorFilter,
+}: EquipmentTableProps) {
+  const filtered = equipments.filter((eq) => {
+    const matchSearch =
+      !search ||
+      eq.tag?.toLowerCase().includes(search.toLowerCase()) ||
+      (eq.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (eq.model ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchCriticality =
+      !criticalityFilter || eq.criticality === criticalityFilter;
+    const matchSector =
+      !sectorFilter || eq.sector?.name === sectorFilter;
+    return matchSearch && matchCriticality && matchSector;
+  });
 
-export function EquipmentTable() {
+  if (error) {
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+        <p className="text-red-700">{error}</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-slate-100 bg-white">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (filtered.length === 0) {
+    return (
+      <div className="rounded-lg border border-slate-100 bg-white p-12 text-center">
+        <p className="text-slate-500">
+          {equipments.length === 0
+            ? "Nenhum equipamento cadastrado."
+            : "Nenhum equipamento corresponde aos filtros."}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-lg border border-slate-100 bg-white shadow-sm">
       <Table>
         <TableHeader>
           <TableRow className="border-slate-100 hover:bg-transparent">
             <TableHead className="w-20">Foto</TableHead>
-            <TableHead>TAG/Nome</TableHead>
+            <TableHead>TAG / Nome</TableHead>
             <TableHead>Modelo</TableHead>
             <TableHead>Setor</TableHead>
-            <TableHead>Próxima Intervenção</TableHead>
-            <TableHead>Status</TableHead>
             <TableHead>Criticidade</TableHead>
             <TableHead className="w-24">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {equipment.map((item) => (
-            <TableRow
-              key={item.id}
-              className="border-slate-100 hover:bg-slate-50/50"
-            >
-              <TableCell>
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                  <span className="text-xs text-slate-400">IMG</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div>
-                  <p className="font-medium text-slate-700">{item.tag}</p>
-                  <p className="text-sm text-slate-500">{item.name}</p>
-                </div>
-              </TableCell>
-              <TableCell className="text-sm text-slate-500">
-                {item.model}
-              </TableCell>
-              <TableCell className="text-sm text-slate-500">
-                {item.sector}
-              </TableCell>
-              <TableCell className="text-sm text-slate-500">
-                {new Date(item.nextIntervention).toLocaleDateString("pt-BR")}
-              </TableCell>
-              <TableCell>
-                <Badge variant={statusMap[item.status].variant}>
-                  {statusMap[item.status].label}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant={criticalityMap[item.criticality].variant}>
-                  {criticalityMap[item.criticality].label}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/equipamentos/${item.id}`}
-                    className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Link>
-                  <button className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600">
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+          {filtered.map((item) => {
+            const photo = item.photos?.[0];
+            return (
+              <TableRow
+                key={item.id}
+                className="border-slate-100 hover:bg-slate-50/50"
+              >
+                <TableCell>
+                  <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                    {photo?.url ? (
+                      <Image
+                        src={photo.fullUrl || photo.url}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div>
+                    <p className="font-medium text-slate-700">{item.tag}</p>
+                    <p className="text-sm text-slate-500">
+                      {item.name ?? "—"}
+                    </p>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm text-slate-500">
+                  {item.model ?? "—"}
+                </TableCell>
+                <TableCell className="text-sm text-slate-500">
+                  {item.sector?.name ?? "—"}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={getCriticalityVariant(item.criticality)}>
+                    {getCriticalityLabel(item.criticality)}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/equipamentos/${item.id}`}
+                      className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                      aria-label="Ver detalhes"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                    <button
+                      type="button"
+                      className="group rounded-md p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                      aria-label="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
