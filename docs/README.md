@@ -17,6 +17,7 @@ Esta pasta contém a documentação dos sistemas do **Inova**. Ela pode ser **co
 | [INOVA-API.md](INOVA-API.md) | inova-api | Backend (NestJS, Prisma, PostgreSQL): módulos, endpoints, autenticação, modelo de dados |
 | [INOVA-APP.md](INOVA-APP.md) | inova-app | App de cadastro (Expo): rotas, componentes, cadastros, organização de rotas, integração com a API |
 | [INOVA-ADM.md](INOVA-ADM.md) | inova-adm | Painel administrativo (Next.js): dashboard, equipamentos, planejamento, programação |
+| [CALENDARIO-PLANEJAMENTO.md](CALENDARIO-PLANEJAMENTO.md) | inova-adm | Calendário da aba Planejamento: grade semanal, agendamento de rotas, drag-and-drop, API |
 | [INOVA-WORKER-APP.md](INOVA-WORKER-APP.md) | inova-worker-app | App do operador (Expo): login Worker, rotas, execução em campo |
 | [INOVA-DIAGNOSIS.md](INOVA-DIAGNOSIS.md) | inova-diagnosis | Diagnóstico de maturidade (Next.js): questionário, sem integração com a API |
 | [INOVA-INSTITUTIONAL.md](INOVA-INSTITUTIONAL.md) | inova-institutional | Site institucional (Next.js): landing, páginas estáticas, sem integração com a API |

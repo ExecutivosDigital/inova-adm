@@ -23,6 +23,15 @@ export interface FilterCatalogs {
   serviceModels: CatalogItem[];
   epis: CatalogItem[];
   toolkits: CatalogItem[];
+  /** Catálogos do equipamento (cip.subset.set.equipment) */
+  sectors: CatalogItem[];
+  equipmentTypes: CatalogItem[];
+  manufacturers: CatalogItem[];
+  costCenters: CatalogItem[];
+  safetyConditions: CatalogItem[];
+  lubricationSystems: CatalogItem[];
+  mainComponents: CatalogItem[];
+  powerUnits: CatalogItem[];
 }
 
 const emptyCatalogs: FilterCatalogs = {
@@ -37,6 +46,14 @@ const emptyCatalogs: FilterCatalogs = {
   serviceModels: [],
   epis: [],
   toolkits: [],
+  sectors: [],
+  equipmentTypes: [],
+  manufacturers: [],
+  costCenters: [],
+  safetyConditions: [],
+  lubricationSystems: [],
+  mainComponents: [],
+  powerUnits: [],
 };
 
 function normalizeCatalog(body: unknown, key: string): CatalogItem[] {
@@ -80,6 +97,14 @@ export function useFilterCatalogs() {
         serviceModelRes,
         epiRes,
         toolkitRes,
+        sectorRes,
+        equipmentTypeRes,
+        manufacturerRes,
+        costCenterRes,
+        safetyConditionRes,
+        lubricationSystemRes,
+        mainComponentRes,
+        powerUnitRes,
       ] = await Promise.all([
         GetAPI("/period", true),
         GetAPI("/priority", true),
@@ -92,6 +117,14 @@ export function useFilterCatalogs() {
         GetAPI("/service-model", true),
         GetAPI(isSuperAdmin ? `/epi${companyQuery}` : "/epi", true),
         GetAPI(isSuperAdmin ? `/toolkit${companyQuery}` : "/toolkit", true),
+        GetAPI(isSuperAdmin ? `/sector${companyQuery}` : "/sector", true),
+        GetAPI("/equipment-type", true),
+        GetAPI("/manufacturer", true),
+        GetAPI(isSuperAdmin ? `/cost-center${companyQuery}` : "/cost-center", true),
+        GetAPI("/safety-condition", true),
+        GetAPI("/lubrication-system", true),
+        GetAPI("/main-component", true),
+        GetAPI("/power-unit", true),
       ]);
 
       setCatalogs({
@@ -112,6 +145,27 @@ export function useFilterCatalogs() {
           serviceModelRes.status === 200 ? normalizeCatalog(serviceModelRes.body, "serviceModels") : [],
         epis: epiRes.status === 200 ? normalizeCatalog(epiRes.body, "epis") : [],
         toolkits: toolkitRes.status === 200 ? normalizeCatalog(toolkitRes.body, "toolkits") : [],
+        sectors: sectorRes.status === 200 ? normalizeCatalog(sectorRes.body, "sectors") : [],
+        equipmentTypes:
+          equipmentTypeRes.status === 200 ? normalizeCatalog(equipmentTypeRes.body, "equipmentTypes") : [],
+        manufacturers:
+          manufacturerRes.status === 200 ? normalizeCatalog(manufacturerRes.body, "manufacturers") : [],
+        costCenters:
+          costCenterRes.status === 200 ? normalizeCatalog(costCenterRes.body, "costCenters") : [],
+        safetyConditions:
+          safetyConditionRes.status === 200
+            ? normalizeCatalog(safetyConditionRes.body, "safetyConditions")
+            : [],
+        lubricationSystems:
+          lubricationSystemRes.status === 200
+            ? normalizeCatalog(lubricationSystemRes.body, "lubricationSystems")
+            : [],
+        mainComponents:
+          mainComponentRes.status === 200
+            ? normalizeCatalog(mainComponentRes.body, "mainComponents")
+            : [],
+        powerUnits:
+          powerUnitRes.status === 200 ? normalizeCatalog(powerUnitRes.body, "powerUnits") : [],
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar catálogos");

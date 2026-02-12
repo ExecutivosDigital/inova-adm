@@ -55,6 +55,14 @@ export function PlanningRoutesFiltersPanel({
     if (draft.serviceModelIds?.length) payload.serviceModelIds = draft.serviceModelIds;
     if (draft.epiIds?.length) payload.epiIds = draft.epiIds;
     if (draft.toolkitIds?.length) payload.toolkitIds = draft.toolkitIds;
+    if (draft.sectorIds?.length) payload.sectorIds = draft.sectorIds;
+    if (draft.equipmentTypeIds?.length) payload.equipmentTypeIds = draft.equipmentTypeIds;
+    if (draft.manufacturerIds?.length) payload.manufacturerIds = draft.manufacturerIds;
+    if (draft.costCenterIds?.length) payload.costCenterIds = draft.costCenterIds;
+    if (draft.safetyConditionIds?.length) payload.safetyConditionIds = draft.safetyConditionIds;
+    if (draft.lubricationSystemIds?.length) payload.lubricationSystemIds = draft.lubricationSystemIds;
+    if (draft.mainComponentIds?.length) payload.mainComponentIds = draft.mainComponentIds;
+    if (draft.powerUnitIds?.length) payload.powerUnitIds = draft.powerUnitIds;
     onApply(payload);
     onClose?.();
   }, [draft, onApply, onClose]);
@@ -77,6 +85,14 @@ export function PlanningRoutesFiltersPanel({
     draft.serviceModelIds?.length,
     draft.epiIds?.length,
     draft.toolkitIds?.length,
+    draft.sectorIds?.length,
+    draft.equipmentTypeIds?.length,
+    draft.manufacturerIds?.length,
+    draft.costCenterIds?.length,
+    draft.safetyConditionIds?.length,
+    draft.lubricationSystemIds?.length,
+    draft.mainComponentIds?.length,
+    draft.powerUnitIds?.length,
   ].filter((n) => n && n > 0).length;
 
   if (loading) {
@@ -116,8 +132,9 @@ export function PlanningRoutesFiltersPanel({
         </div>
       )}
       <p className="text-xs text-slate-500">
-        Filtre por período, prioridade, time, condição, sistema de trabalho, tempo de execução,
-        modelo de serviço, EPI e toolkit. Os mesmos filtros valem para a lista da tela e para a
+        Filtre por dados do serviço (período, prioridade, time, modelo, EPI, toolkit, etc.) e por
+        equipamento (setor, tipo, fabricante, centro de custo, condição de segurança, lubrificação,
+        componente principal, unidade de potência). Os mesmos filtros valem para a lista e para a
         criação de rotas.
       </p>
       <div className={gridClass}>
@@ -218,6 +235,79 @@ export function PlanningRoutesFiltersPanel({
               selectedIds={draft.toolkitIds ?? []}
               onToggle={(id, checked) => toggleArray("toolkitIds", id, checked)}
               searchPlaceholder="Buscar toolkit..."
+          />
+        )}
+        {/* Filtros por equipamento */}
+        {catalogs.sectors.length > 0 && (
+          <MultiSelectDropdown
+            label="Setor (equipamento)"
+            items={catalogs.sectors}
+            selectedIds={draft.sectorIds ?? []}
+            onToggle={(id, checked) => toggleArray("sectorIds", id, checked)}
+            searchPlaceholder="Buscar setor..."
+          />
+        )}
+        {catalogs.equipmentTypes.length > 0 && (
+          <MultiSelectDropdown
+            label="Tipo de equipamento"
+            items={catalogs.equipmentTypes}
+            selectedIds={draft.equipmentTypeIds ?? []}
+            onToggle={(id, checked) => toggleArray("equipmentTypeIds", id, checked)}
+            searchPlaceholder="Buscar tipo..."
+          />
+        )}
+        {catalogs.manufacturers.length > 0 && (
+          <MultiSelectDropdown
+            label="Fabricante"
+            items={catalogs.manufacturers}
+            selectedIds={draft.manufacturerIds ?? []}
+            onToggle={(id, checked) => toggleArray("manufacturerIds", id, checked)}
+            searchPlaceholder="Buscar fabricante..."
+          />
+        )}
+        {catalogs.costCenters.length > 0 && (
+          <MultiSelectDropdown
+            label="Centro de custo"
+            items={catalogs.costCenters}
+            selectedIds={draft.costCenterIds ?? []}
+            onToggle={(id, checked) => toggleArray("costCenterIds", id, checked)}
+            searchPlaceholder="Buscar centro de custo..."
+          />
+        )}
+        {catalogs.safetyConditions.length > 0 && (
+          <MultiSelectDropdown
+            label="Condição de segurança (equip.)"
+            items={catalogs.safetyConditions}
+            selectedIds={draft.safetyConditionIds ?? []}
+            onToggle={(id, checked) => toggleArray("safetyConditionIds", id, checked)}
+            searchPlaceholder="Buscar condição..."
+          />
+        )}
+        {catalogs.lubricationSystems.length > 0 && (
+          <MultiSelectDropdown
+            label="Sistema de lubrificação"
+            items={catalogs.lubricationSystems}
+            selectedIds={draft.lubricationSystemIds ?? []}
+            onToggle={(id, checked) => toggleArray("lubricationSystemIds", id, checked)}
+            searchPlaceholder="Buscar sistema..."
+          />
+        )}
+        {catalogs.mainComponents.length > 0 && (
+          <MultiSelectDropdown
+            label="Componente principal"
+            items={catalogs.mainComponents}
+            selectedIds={draft.mainComponentIds ?? []}
+            onToggle={(id, checked) => toggleArray("mainComponentIds", id, checked)}
+            searchPlaceholder="Buscar componente..."
+          />
+        )}
+        {catalogs.powerUnits.length > 0 && (
+          <MultiSelectDropdown
+            label="Unidade de potência"
+            items={catalogs.powerUnits}
+            selectedIds={draft.powerUnitIds ?? []}
+            onToggle={(id, checked) => toggleArray("powerUnitIds", id, checked)}
+            searchPlaceholder="Buscar unidade..."
           />
         )}
       </div>

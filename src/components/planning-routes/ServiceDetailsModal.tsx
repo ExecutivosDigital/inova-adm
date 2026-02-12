@@ -2,15 +2,15 @@
 
 import type { CipService } from "@/lib/route-types";
 import {
-  Calendar,
-  Clock,
-  Layers,
-  Package,
-  Settings,
-  Tag,
-  Users,
-  Wrench,
-  X,
+    Calendar,
+    Clock,
+    Layers,
+    Package,
+    Settings,
+    Tag,
+    Users,
+    Wrench,
+    X,
 } from "lucide-react";
 
 interface ServiceDetailsModalProps {
@@ -56,11 +56,22 @@ export function ServiceDetailsModal({
 
   const hasEquipmentCip =
     equipment?.name ||
+    equipment?.tag ||
     equipment?.code ||
     set?.name ||
     subset?.name ||
     cip?.name ||
     cip?.code;
+
+  const hasEquipmentRefs =
+    equipment?.sector?.name ||
+    equipment?.equipmentType?.name ||
+    equipment?.manufacturer?.name ||
+    equipment?.costCenter?.name ||
+    equipment?.safetyCondition?.name ||
+    equipment?.lubricationSystem?.name ||
+    equipment?.mainComponent?.name ||
+    equipment?.powerUnit?.name;
   const hasServiceInfo =
     service?.serviceModel?.name || service?.serviceModel?.description;
   const hasPlanningExecution =
@@ -115,8 +126,11 @@ export function ServiceDetailsModal({
                       <DetailRow
                         icon={Package}
                         label="Equipamento"
-                        value={equipment?.name}
+                        value={equipment?.name ?? equipment?.tag}
                       />
+                      {equipment?.tag && equipment?.name && (
+                        <DetailRow icon={Tag} label="Tag" value={equipment.tag} />
+                      )}
                       {equipment?.code && (
                         <DetailRow
                           icon={Tag}
@@ -140,6 +154,58 @@ export function ServiceDetailsModal({
                   )}
                 </div>
               </section>
+
+              {/* Campos do cadastro de equipamento (setor, tipo, fabricante, etc.) */}
+              {hasEquipmentRefs && (
+                <section>
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <Package className="h-4 w-4" />
+                    Dados do equipamento
+                  </h3>
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-4">
+                    <DetailRow
+                      icon={Layers}
+                      label="Setor"
+                      value={equipment?.sector?.name}
+                    />
+                    <DetailRow
+                      icon={Package}
+                      label="Tipo de equipamento"
+                      value={equipment?.equipmentType?.name}
+                    />
+                    <DetailRow
+                      icon={Settings}
+                      label="Fabricante"
+                      value={equipment?.manufacturer?.name}
+                    />
+                    <DetailRow
+                      icon={Tag}
+                      label="Centro de custo"
+                      value={equipment?.costCenter?.name}
+                    />
+                    <DetailRow
+                      icon={Settings}
+                      label="Condição de segurança"
+                      value={equipment?.safetyCondition?.name}
+                    />
+                    <DetailRow
+                      icon={Wrench}
+                      label="Sistema de lubrificação"
+                      value={equipment?.lubricationSystem?.name}
+                    />
+                    <DetailRow
+                      icon={Package}
+                      label="Componente principal"
+                      value={equipment?.mainComponent?.name}
+                    />
+                    <DetailRow
+                      icon={Settings}
+                      label="Unidade de potência"
+                      value={equipment?.powerUnit?.name}
+                    />
+                  </div>
+                </section>
+              )}
 
               {/* Modelo de serviço */}
               <section>

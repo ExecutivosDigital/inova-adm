@@ -4,28 +4,41 @@ import { Badge } from "@/components/ui/badge";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
 import type {
-  CipService,
-  FilterServicesPayload,
-  Route,
-  RouteCipServiceItem,
+    CipService,
+    FilterServicesPayload,
+    Route,
+    RouteCipServiceItem,
 } from "@/lib/route-types";
+import { formatExecutionMinutes, totalExecutionMinutes } from "@/lib/route-types";
 import {
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  Filter,
-  Loader2,
-  Minus,
-  Plus,
-  Route as RouteIcon,
-  Trash2,
+    ArrowRight,
+    ChevronDown,
+    ChevronUp,
+    Eye,
+    Filter,
+    Loader2,
+    Minus,
+    Plus,
+    Route as RouteIcon,
+    Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PlanningRoutesFiltersPanel } from "./PlanningRoutesFiltersPanel";
 import { RouteFormModal } from "./RouteFormModal";
 import { RouteSelectModal } from "./RouteSelectModal";
 import { ServiceDetailsModal } from "./ServiceDetailsModal";
+
+/** Resumo dos campos de equipamento para exibir nas listas (setor, tipo, fabricante). */
+function equipmentSummary(service: CipService | undefined): string {
+  const eq = service?.cip?.subset?.set?.equipment;
+  if (!eq) return "";
+  const parts = [
+    eq.sector?.name,
+    eq.equipmentType?.name,
+    eq.manufacturer?.name,
+  ].filter(Boolean) as string[];
+  return parts.join(" · ");
+}
 
 export function PlanningRoutesContent() {
   const { GetAPI, PostAPI, PutAPI, DeleteAPI } = useApiContext();
@@ -120,6 +133,14 @@ export function PlanningRoutesContent() {
       "serviceModelIds",
       "epiIds",
       "toolkitIds",
+      "sectorIds",
+      "equipmentTypeIds",
+      "manufacturerIds",
+      "costCenterIds",
+      "safetyConditionIds",
+      "lubricationSystemIds",
+      "mainComponentIds",
+      "powerUnitIds",
     ];
     return keys.filter((k) => (filters[k] as string[] | undefined)?.length).length;
   }, [filters]);
@@ -137,6 +158,30 @@ export function PlanningRoutesContent() {
     );
     return cipServices.filter((cs) => !idsInPermanent.has(cs.id));
   }, [cipServices, routeCipServices, permanentRoutes]);
+
+  /** Tempo total (min) dos serviços selecionados para criar/adicionar à rota */
+  const totalExecutionMinutesSelected = useMemo(() => {
+    const services = Array.from(selectedServiceIds)
+      .map((id) => cipServicesAvailableForRoute.find((cs) => cs.id === id))
+      .filter(Boolean) as CipService[];
+    return totalExecutionMinutes(services);
+  }, [selectedServiceIds, cipServicesAvailableForRoute]);
+
+  /** Tempo total (min) dos serviços da rota visualizada */
+  const totalExecutionMinutesViewingRoute = useMemo(
+    () => totalExecutionMinutes(servicesInViewingRoute),
+    [servicesInViewingRoute]
+  );
+
+  /** Mapa routeId -> tempo total em minutos (para exibir nos chips) */
+  const totalExecutionMinutesByRouteId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const route of permanentRoutes) {
+      const items = routeCipServices.filter((rcs) => rcs.routeId === route.id);
+      map.set(route.id, totalExecutionMinutes(items));
+    }
+    return map;
+  }, [permanentRoutes, routeCipServices]);
 
   const cipServiceIdsToRemove = useMemo(() => {
     if (!viewingRoute) return [];
@@ -317,16 +362,8 @@ export function PlanningRoutesContent() {
         </div>
       )}
 
-      {/* Header + actions */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Organização de Rotas
-          </h1>
-          <p className="text-slate-500">
-            Crie rotas e vincule serviços (CIP) para planejamento
-          </p>
-        </div>
+      {/* Ações da aba (filtros e nova rota) */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -415,6 +452,11 @@ export function PlanningRoutesContent() {
                   }`}
                 >
                   {route.code} – {route.name}
+                  {(totalExecutionMinutesByRouteId.get(route.id) ?? 0) > 0 && (
+                    <span className="ml-1.5 opacity-90">
+                      ({formatExecutionMinutes(totalExecutionMinutesByRouteId.get(route.id) ?? 0)})
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -448,6 +490,11 @@ export function PlanningRoutesContent() {
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
           <p className="mb-2 text-sm font-semibold text-slate-900">
             {selectedServiceIds.size} serviço(s) selecionado(s)
+            {totalExecutionMinutesSelected > 0 && (
+              <span className="ml-2 font-normal text-slate-600">
+                (tempo total estimado: {formatExecutionMinutes(totalExecutionMinutesSelected)})
+              </span>
+            )}
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -478,6 +525,11 @@ export function PlanningRoutesContent() {
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
           <p className="mb-2 text-sm font-semibold text-slate-900">
             {selectedServiceIds.size} serviço(s) selecionado(s) → {viewingRoute.code}
+            {totalExecutionMinutesSelected > 0 && (
+              <span className="ml-2 font-normal text-slate-600">
+                (+ {formatExecutionMinutes(totalExecutionMinutesSelected)})
+              </span>
+            )}
           </p>
           <button
             type="button"
@@ -512,7 +564,14 @@ export function PlanningRoutesContent() {
         {/* Serviços nesta rota */}
         <div className="rounded-lg border border-slate-200 bg-white">
           <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-            <h3 className="font-semibold text-slate-900">Serviços nesta rota</h3>
+            <h3 className="font-semibold text-slate-900">
+              Serviços nesta rota
+              {viewingRoute && totalExecutionMinutesViewingRoute > 0 && (
+                <span className="ml-2 font-normal text-slate-600">
+                  (total: {formatExecutionMinutes(totalExecutionMinutesViewingRoute)})
+                </span>
+              )}
+            </h3>
             <p className="text-xs text-slate-500">
               {viewingRoute
                 ? "Selecione para remover da rota."
@@ -543,17 +602,24 @@ export function PlanningRoutesContent() {
                 {servicesInViewingRoute.map((rcs) => (
                   <li
                     key={rcs.id}
-                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm transition-colors ${
+                    className={`flex cursor-pointer items-start justify-between gap-2 rounded-lg border p-3 text-sm transition-colors ${
                       selectedRouteServiceIds.has(rcs.id)
                         ? "border-primary bg-primary/5"
                         : "border-slate-100 hover:bg-slate-50"
                     }`}
                     onClick={() => toggleRouteServiceSelection(rcs.id)}
                   >
-                    <span className="min-w-0 flex-1 font-medium text-slate-800">
-                      {rcs.cipService?.cip?.subset?.set?.equipment?.name ?? "—"} /{" "}
-                      {rcs.cipService?.serviceModel?.name ?? "—"}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-slate-800">
+                        {rcs.cipService?.cip?.subset?.set?.equipment?.name ?? "—"} /{" "}
+                        {rcs.cipService?.serviceModel?.name ?? "—"}
+                      </span>
+                      {equipmentSummary(rcs.cipService) && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {equipmentSummary(rcs.cipService)}
+                        </p>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -615,20 +681,27 @@ export function PlanningRoutesContent() {
                 {cipServicesAvailableForRoute.map((cs) => (
                   <li
                     key={cs.id}
-                    className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border p-3 text-sm transition-colors ${
+                    className={`flex cursor-pointer items-start justify-between gap-2 rounded-lg border p-3 text-sm transition-colors ${
                       selectedServiceIds.has(cs.id)
                         ? "border-primary bg-primary/5"
                         : "border-slate-100 hover:bg-slate-50"
                     }`}
                     onClick={() => toggleServiceSelection(cs.id)}
                   >
-                    <span className="min-w-0 flex-1 font-medium text-slate-800">
-                      {cs.cip?.subset?.set?.equipment?.name ?? "—"} /{" "}
-                      {cs.serviceModel?.name ?? "—"}
-                      {cs.period?.name && (
-                        <span className="ml-1 text-slate-500">({cs.period.name})</span>
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-slate-800">
+                        {cs.cip?.subset?.set?.equipment?.name ?? "—"} /{" "}
+                        {cs.serviceModel?.name ?? "—"}
+                        {cs.period?.name && (
+                          <span className="ml-1 text-slate-500">({cs.period.name})</span>
+                        )}
+                      </span>
+                      {equipmentSummary(cs) && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          {equipmentSummary(cs)}
+                        </p>
                       )}
-                    </span>
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
