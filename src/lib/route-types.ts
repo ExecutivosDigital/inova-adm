@@ -131,6 +131,31 @@ export interface RouteScheduleItem {
   route?: { id: string; name: string; code: string; companyId: string };
 }
 
+/** Agendamento de serviço individual com início em data/hora (resposta de GET /planning/schedules/:companyId). */
+export interface ServiceScheduleItem {
+  id: string;
+  cipServiceId: string;
+  scheduledStartAt: string;
+  cipService?: CipService & {
+    executionTime?: { id: string; name: string; minutes: number } | null;
+    period?: { id: string; name: string; days: number } | null;
+  };
+}
+
+/** Union de agendamentos (rota ou serviço). */
+export type PlanningScheduleItem = 
+  | (RouteScheduleItem & { type: 'route' })
+  | (ServiceScheduleItem & { type: 'service' });
+
+/** Indicador de carga de trabalho para um dia. */
+export interface WorkloadIndicator {
+  date: string; // YYYY-MM-DD
+  scheduledHours: number;
+  availableHours: number;
+  utilization: number; // 0-100
+  status: 'low' | 'medium' | 'high';
+}
+
 /** Payload para POST /filter-services */
 export interface FilterServicesPayload {
   companyId?: string;

@@ -98,6 +98,7 @@ export default function LoginForm() {
       };
 
       const response = await PostAPI("/admin/signin", payload, false);
+      console.log(response);
 
       if (response.status === 200) {
         const body: SignInSuccess = response.body;
