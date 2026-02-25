@@ -258,59 +258,64 @@ function DayColumn({
       </div>
 
       {/* Lista de agendamentos */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0">
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0 flex flex-col">
         {!isWorkDay ? (
           <p className="text-xs text-slate-400 text-center py-4">
             Não é dia útil
           </p>
-        ) : sortedSchedules.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-xs text-slate-400 mb-2">
-              Nenhum agendamento
-            </p>
+        ) : (
+          <>
+            {sortedSchedules.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center flex-1">
+                <p className="text-xs text-slate-400 mb-2">
+                  Nenhum agendamento
+                </p>
+              </div>
+            ) : (
+              sortedSchedules.map((schedule) => {
+                const isRoute = schedule.type === "route";
+                const displayName = isRoute
+                  ? `${schedule.route?.code} – ${schedule.route?.name}`
+                  : `${schedule.service?.name} (${schedule.service?.equipmentName})`;
+
+                const scheduleDate = new Date(schedule.scheduledStartAt);
+                const br = toBrazilLocal(scheduleDate);
+                const timeStr = `${String(br.hours).padStart(2, "0")}:${String(br.minutes).padStart(2, "0")}`;
+
+                const isMoving = movingScheduleId === schedule.id;
+                const dragId = `schedule-${schedule.id}`;
+                const dragData: ScheduleDragData = {
+                  scheduleId: schedule.id,
+                  type: schedule.type,
+                };
+
+                return (
+                  <DraggableScheduleCard
+                    key={schedule.id}
+                    id={dragId}
+                    data={dragData}
+                    isMoving={isMoving}
+                    schedule={schedule}
+                    timeStr={timeStr}
+                    displayName={displayName}
+                    isRoute={isRoute}
+                    onRemove={() => onRemoveSchedule(schedule.id)}
+                  />
+                );
+              })
+            )}
             <button
               type="button"
               onClick={() => {
                 const startMin = parseTimeToMinutes(companySchedule.businessHoursStart);
                 onAddSchedule("route", dateKey, startMin);
               }}
-              className="text-xs text-primary hover:underline"
+              className="mt-2 shrink-0 flex items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-2 px-3 text-xs font-medium text-slate-600 hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
             >
-              + Adicionar
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar agendamento
             </button>
-          </div>
-        ) : (
-          sortedSchedules.map((schedule) => {
-            const isRoute = schedule.type === "route";
-            const displayName = isRoute
-              ? `${schedule.route?.code} – ${schedule.route?.name}`
-              : `${schedule.service?.name} (${schedule.service?.equipmentName})`;
-
-            const scheduleDate = new Date(schedule.scheduledStartAt);
-            const br = toBrazilLocal(scheduleDate);
-            const timeStr = `${String(br.hours).padStart(2, "0")}:${String(br.minutes).padStart(2, "0")}`;
-
-            const isMoving = movingScheduleId === schedule.id;
-            const dragId = `schedule-${schedule.id}`;
-            const dragData: ScheduleDragData = {
-              scheduleId: schedule.id,
-              type: schedule.type,
-            };
-
-            return (
-              <DraggableScheduleCard
-                key={schedule.id}
-                id={dragId}
-                data={dragData}
-                isMoving={isMoving}
-                schedule={schedule}
-                timeStr={timeStr}
-                displayName={displayName}
-                isRoute={isRoute}
-                onRemove={() => onRemoveSchedule(schedule.id)}
-              />
-            );
-          })
+          </>
         )}
       </div>
     </div>

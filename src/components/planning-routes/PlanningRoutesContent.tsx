@@ -23,6 +23,7 @@ import {
     Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getPeriodDifferenceWarning } from "./periodWarning";
 import { PlanningRoutesFiltersPanel } from "./PlanningRoutesFiltersPanel";
 import { RouteFormModal } from "./RouteFormModal";
 import { RouteSelectModal } from "./RouteSelectModal";
@@ -182,6 +183,12 @@ export function PlanningRoutesContent() {
     }
     return map;
   }, [permanentRoutes, routeCipServices]);
+
+  /** Aviso quando períodos dos serviços selecionados forem muito diferentes */
+  const periodWarning = useMemo(() => {
+    if (selectedServiceIds.size === 0) return { shouldWarn: false as const };
+    return getPeriodDifferenceWarning(cipServicesAvailableForRoute, selectedServiceIds);
+  }, [selectedServiceIds, cipServicesAvailableForRoute]);
 
   const cipServiceIdsToRemove = useMemo(() => {
     if (!viewingRoute) return [];
@@ -496,6 +503,11 @@ export function PlanningRoutesContent() {
               </span>
             )}
           </p>
+          {periodWarning.shouldWarn && periodWarning.message ? (
+            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
+              {periodWarning.message}
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -531,6 +543,11 @@ export function PlanningRoutesContent() {
               </span>
             )}
           </p>
+          {periodWarning.shouldWarn && periodWarning.message ? (
+            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
+              {periodWarning.message}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => handleAddToRoute(viewingRoute.id)}

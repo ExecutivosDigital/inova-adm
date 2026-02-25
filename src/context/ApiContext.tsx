@@ -132,7 +132,6 @@ export const ApiContextProvider = ({ children }: ProviderProps) => {
         const status = err.response.status;
         return { status, body: message };
       });
-
     return connect.status === 500
       ? {
           status: connect.status,

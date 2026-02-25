@@ -1,8 +1,8 @@
 import { useApiContext } from '@/context/ApiContext';
 import type {
-  ServiceScheduleItem,
   PlanningScheduleItem,
   RouteScheduleItem,
+  ServiceScheduleItem,
   WorkloadIndicator,
 } from './route-types';
 
@@ -49,7 +49,8 @@ export async function createServiceSchedule(
   apiContext: ReturnType<typeof useApiContext>
 ): Promise<{ serviceSchedule: ServiceScheduleItem }> {
   const res = await apiContext.PostAPI('/planning/service-schedule', data, true);
-  if (res.status === 201 && res.body?.serviceSchedule) {
+  console.log("createServiceSchedule res", res);
+  if (res.status === 200 && res.body?.serviceSchedule) {
     return { serviceSchedule: res.body.serviceSchedule as ServiceScheduleItem };
   }
   throw new Error('Erro ao criar agendamento de serviço');
@@ -100,7 +101,7 @@ export async function autoGeneratePlanning(
   apiContext: ReturnType<typeof useApiContext>
 ): Promise<{ created: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> }> {
   const res = await apiContext.PostAPI('/planning/auto-generate', options, true);
-  if (res.status === 201 && res.body) {
+  if (res.status === 200 && res.body) {
     return res.body as { created: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> };
   }
   throw new Error('Erro ao gerar planejamento automático');

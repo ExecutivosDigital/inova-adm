@@ -77,8 +77,13 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
         fetchSchedules(effectiveCompanyId, apiContext),
         apiContext.GetAPI(`/company/${effectiveCompanyId}`, true),
         apiContext.GetAPI(isSuperAdmin ? `/route?companyId=${effectiveCompanyId}` : "/route", true),
-        apiContext.GetAPI(`/filter-services?companyId=${effectiveCompanyId}`, true),
+        apiContext.PostAPI(`/filter-services`, { companyId: effectiveCompanyId }, true),
       ]);
+
+      console.log("schedulesResult", schedulesResult);
+      console.log("companyRes", companyRes);
+      console.log("routesRes", routesRes);
+      console.log("servicesRes", servicesRes);
 
       setRouteSchedules(schedulesResult.routeSchedules);
       setServiceSchedules(schedulesResult.serviceSchedules);
@@ -290,7 +295,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
         if (schedule.type === "service") {
           await deleteServiceSchedule(scheduleId, effectiveCompanyId, apiContext);
         } else {
-          await apiContext.DeleteAPI(`/route/schedule/${scheduleId}`, true);
+          await apiContext.DeleteAPI(isSuperAdmin ? `/route/schedule/${scheduleId}?companyId=${effectiveCompanyId}` : `/route/schedule/${scheduleId}`, true);
         }
         await fetchData();
       } catch (error) {
@@ -400,7 +405,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
   };
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] flex-col overflow-hidden">
+    <div className="flex min-h-[calc(100vh-12rem)] flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex-shrink-0 border-b border-slate-200 bg-white px-6 py-3">
         <div className="flex items-center justify-between">
@@ -449,7 +454,8 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           <AdvancedMonthlyCalendar
             indicators={workloadIndicators}
             onDateClick={(dateKey) => {
-              const date = new Date(dateKey);
+              const [y, m, d] = dateKey.split("-").map(Number);
+              const date = new Date(y, m - 1, d);
               setCurrentDate(startOfDay(date));
               setViewMode("day");
             }}

@@ -1,9 +1,9 @@
 "use client";
 
+import type { WorkloadIndicator } from "@/lib/planning-advanced-types";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { WorkloadIndicator } from "@/lib/planning-advanced-types";
 
 interface AdvancedMonthlyCalendarProps {
   indicators: WorkloadIndicator[];

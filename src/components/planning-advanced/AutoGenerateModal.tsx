@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Loader2, Calendar, Sparkles } from "lucide-react";
 import type { AutoGenerateOptions } from "@/lib/planning-advanced-types";
+import { Calendar, Loader2, Sparkles } from "lucide-react";
+import { useState } from "react";
 
 interface AutoGenerateModalProps {
   open: boolean;

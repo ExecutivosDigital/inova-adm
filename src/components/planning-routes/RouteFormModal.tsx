@@ -1,8 +1,9 @@
 "use client";
 
 import type { CipService, Route } from "@/lib/route-types";
+import { getPeriodDifferenceWarning } from "@/components/planning-routes/periodWarning";
 import { Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface RouteFormModalProps {
   open: boolean;
@@ -42,6 +43,13 @@ export function RouteFormModal({
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const isEditMode = !!route;
+
+  const periodWarning = useMemo(() => {
+    if (isEditMode || !initialSelectedServiceIds?.length || !initialCipServices?.length) {
+      return { shouldWarn: false as const };
+    }
+    return getPeriodDifferenceWarning(initialCipServices, initialSelectedServiceIds);
+  }, [isEditMode, initialSelectedServiceIds, initialCipServices]);
 
   useEffect(() => {
     if (open && nameInputRef.current) {
@@ -213,9 +221,16 @@ export function RouteFormModal({
           )}
 
           {!isEditMode && initialSelectedServiceIds?.length ? (
-            <p className="text-sm text-slate-500">
-              {initialSelectedServiceIds.length} serviço(s) serão vinculados à nova rota.
-            </p>
+            <>
+              {periodWarning.shouldWarn && periodWarning.message ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  {periodWarning.message}
+                </div>
+              ) : null}
+              <p className="text-sm text-slate-500">
+                {initialSelectedServiceIds.length} serviço(s) serão vinculados à nova rota.
+              </p>
+            </>
           ) : null}
 
           <div className="flex justify-end gap-2 pt-4">

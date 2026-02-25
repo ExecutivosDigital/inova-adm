@@ -7,7 +7,7 @@ import { Calendar, Route as RouteIcon } from "lucide-react";
 
 export default function PlanejamentoPage() {
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col overflow-hidden -m-6 lg:-m-8">
+    <div className="flex pb-20 flex-col overflow-hidden -m-6 lg:-m-8">
       <div className="flex-shrink-0 border-b border-slate-200 bg-white px-6 py-4">
         {/* Header */}
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
