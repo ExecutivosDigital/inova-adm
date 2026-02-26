@@ -4,23 +4,24 @@ import { Badge } from "@/components/ui/badge";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
 import type {
-    CipService,
-    FilterServicesPayload,
-    Route,
-    RouteCipServiceItem,
+  CipService,
+  FilterServicesPayload,
+  Route,
+  RouteCipServiceItem,
 } from "@/lib/route-types";
 import { formatExecutionMinutes, totalExecutionMinutes } from "@/lib/route-types";
 import {
-    ArrowRight,
-    ChevronDown,
-    ChevronUp,
-    Eye,
-    Filter,
-    Loader2,
-    Minus,
-    Plus,
-    Route as RouteIcon,
-    Trash2,
+  ArrowRight,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Filter,
+  Loader2,
+  Minus,
+  Plus,
+  Route as RouteIcon,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getPeriodDifferenceWarning } from "./periodWarning";
@@ -184,10 +185,41 @@ export function PlanningRoutesContent() {
     return map;
   }, [permanentRoutes, routeCipServices]);
 
+  /** Mapa routeId -> periodicidade média em dias (para rotas existentes) */
+  const averagePeriodDaysByRouteId = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const route of permanentRoutes) {
+      const items = routeCipServices.filter((rcs) => rcs.routeId === route.id);
+      const daysList = items
+        .map((rcs) => rcs.cipService?.period?.days)
+        .filter((d): d is number => typeof d === "number" && d > 0);
+      if (daysList.length === 0) {
+        map.set(route.id, null);
+      } else {
+        const sum = daysList.reduce((a, b) => a + b, 0);
+        map.set(route.id, Math.round(sum / daysList.length));
+      }
+    }
+    return map;
+  }, [permanentRoutes, routeCipServices]);
+
   /** Aviso quando períodos dos serviços selecionados forem muito diferentes */
   const periodWarning = useMemo(() => {
     if (selectedServiceIds.size === 0) return { shouldWarn: false as const };
     return getPeriodDifferenceWarning(cipServicesAvailableForRoute, selectedServiceIds);
+  }, [selectedServiceIds, cipServicesAvailableForRoute]);
+
+  /** Periodicidade estimada da rota = média (em dias) dos serviços selecionados */
+  const averagePeriodInfo = useMemo(() => {
+    if (selectedServiceIds.size === 0) return null;
+    const selected = cipServicesAvailableForRoute.filter((cs) => selectedServiceIds.has(cs.id));
+    const daysList = selected
+      .map((s) => s.period?.days)
+      .filter((d): d is number => typeof d === "number" && d > 0);
+    if (daysList.length === 0) return { averageDays: null, withDays: 0, total: selected.length };
+    const sum = daysList.reduce((a, b) => a + b, 0);
+    const averageDays = Math.round(sum / daysList.length);
+    return { averageDays, withDays: daysList.length, total: selected.length };
   }, [selectedServiceIds, cipServicesAvailableForRoute]);
 
   const cipServiceIdsToRemove = useMemo(() => {
@@ -464,6 +496,18 @@ export function PlanningRoutesContent() {
                       ({formatExecutionMinutes(totalExecutionMinutesByRouteId.get(route.id) ?? 0)})
                     </span>
                   )}
+                  {averagePeriodDaysByRouteId.get(route.id) != null && (
+                    <span
+                      className={`ml-1.5 inline-flex items-center gap-0.5 opacity-90 ${
+                        viewingRoute?.id === route.id ? "text-white" : "text-slate-500"
+                      }`}
+                      title="Periodicidade da rota (média dos serviços)"
+                    >
+                      <Calendar className="h-3.5 w-3.5" aria-hidden />
+                      {averagePeriodDaysByRouteId.get(route.id)} dia
+                      {averagePeriodDaysByRouteId.get(route.id) !== 1 ? "s" : ""}
+                    </span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -486,8 +530,15 @@ export function PlanningRoutesContent() {
           </div>
         )}
         {viewingRoute && (
-          <p className="mt-2 text-xs text-primary font-medium">
-            Visualizando: {viewingRoute.code} – {viewingRoute.name}
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary font-medium">
+            <span>Visualizando: {viewingRoute.code} – {viewingRoute.name}</span>
+            {averagePeriodDaysByRouteId.get(viewingRoute.id) != null && (
+              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                <Calendar className="h-3 w-3" aria-hidden />
+                {averagePeriodDaysByRouteId.get(viewingRoute.id)} dia
+                {averagePeriodDaysByRouteId.get(viewingRoute.id) !== 1 ? "s" : ""}
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -503,6 +554,35 @@ export function PlanningRoutesContent() {
               </span>
             )}
           </p>
+          {averagePeriodInfo && (
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+              {averagePeriodInfo.averageDays != null ? (
+                <>
+                  <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                    <Calendar className="h-4 w-4 text-primary" aria-hidden />
+                    Periodicidade estimada da rota:
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="bg-primary/10 text-primary font-semibold px-2.5 py-0.5"
+                    title={`Média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços selecionados`}
+                  >
+                    {averagePeriodInfo.averageDays} dia{averagePeriodInfo.averageDays !== 1 ? "s" : ""}
+                  </Badge>
+                  <span className="text-slate-500">
+                    {averagePeriodInfo.withDays < averagePeriodInfo.total
+                      ? `(média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços com periodicidade em dias)`
+                      : `(média entre os ${averagePeriodInfo.total} serviços selecionados)`}
+                  </span>
+                </>
+              ) : (
+                <span className="flex items-center gap-1.5 text-slate-500">
+                  <Calendar className="h-4 w-4" aria-hidden />
+                  Periodicidade: não foi possível calcular (nenhum serviço com periodicidade em dias).
+                </span>
+              )}
+            </div>
+          )}
           {periodWarning.shouldWarn && periodWarning.message ? (
             <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
               {periodWarning.message}
@@ -543,6 +623,35 @@ export function PlanningRoutesContent() {
               </span>
             )}
           </p>
+          {averagePeriodInfo && (
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+              {averagePeriodInfo.averageDays != null ? (
+                <>
+                  <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                    <Calendar className="h-4 w-4 text-primary" aria-hidden />
+                    Periodicidade estimada da rota:
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="bg-primary/10 text-primary font-semibold px-2.5 py-0.5"
+                    title={`Média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços selecionados`}
+                  >
+                    {averagePeriodInfo.averageDays} dia{averagePeriodInfo.averageDays !== 1 ? "s" : ""}
+                  </Badge>
+                  <span className="text-slate-500">
+                    {averagePeriodInfo.withDays < averagePeriodInfo.total
+                      ? `(média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços com periodicidade em dias)`
+                      : `(média entre os ${averagePeriodInfo.total} serviços selecionados)`}
+                  </span>
+                </>
+              ) : (
+                <span className="flex items-center gap-1.5 text-slate-500">
+                  <Calendar className="h-4 w-4" aria-hidden />
+                  Periodicidade: não foi possível calcular (nenhum serviço com periodicidade em dias).
+                </span>
+              )}
+            </div>
+          )}
           {periodWarning.shouldWarn && periodWarning.message ? (
             <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
               {periodWarning.message}
@@ -704,6 +813,7 @@ export function PlanningRoutesContent() {
                         : "border-slate-100 hover:bg-slate-50"
                     }`}
                     onClick={() => toggleServiceSelection(cs.id)}
+                    // onClick={() => console.log(cs)}
                   >
                     <div className="min-w-0 flex-1">
                       <span className="font-medium text-slate-800">

@@ -1,6 +1,7 @@
 "use client";
 
 import { AddScheduleModal } from "@/components/planning-advanced/AddScheduleModal";
+import { AdvancedAnnualView } from "@/components/planning-advanced/AdvancedAnnualView";
 import { AdvancedDayView } from "@/components/planning-advanced/AdvancedDayView";
 import { AdvancedMonthlyCalendar } from "@/components/planning-advanced/AdvancedMonthlyCalendar";
 import { AutoGenerateModal } from "@/components/planning-advanced/AutoGenerateModal";
@@ -25,7 +26,7 @@ import type {
   ServiceScheduleItem,
   WorkloadIndicator
 } from "@/lib/route-types";
-import { addDays, addMonths, addWeeks, startOfDay, subDays, subMonths, subWeeks } from "date-fns";
+import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -45,6 +46,15 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
   const [services, setServices] = useState<CipService[]>([]);
   const [companySchedule, setCompanySchedule] = useState<CompanySchedule | null>(null);
   const [workloadIndicators, setWorkloadIndicators] = useState<WorkloadIndicator[]>([]);
+  const [yearWorkloadSummaries, setYearWorkloadSummaries] = useState<
+    Array<{
+      scheduledHours: number;
+      availableHours: number;
+      utilization: number;
+      status: "low" | "medium" | "high";
+    }> | null
+  >(null);
+  const [loadingYearWorkload, setLoadingYearWorkload] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAutoGenerateModal, setShowAutoGenerateModal] = useState(false);
@@ -135,6 +145,66 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
       });
   }, [effectiveCompanyId, currentDate, viewMode, apiContext]);
 
+  // Buscar indicadores do ano inteiro quando na visão anual
+  useEffect(() => {
+    if (!effectiveCompanyId || viewMode !== "year") {
+      setYearWorkloadSummaries(null);
+      return;
+    }
+    const year = currentDate.getFullYear();
+    setLoadingYearWorkload(true);
+    Promise.all(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) =>
+        fetchWorkload(effectiveCompanyId, year, month, apiContext)
+      )
+    )
+      .then((results) => {
+        const summaries = results.map((r) => {
+          const indicators = r.indicators;
+          const scheduledHours = indicators.reduce((s, i) => s + i.scheduledHours, 0);
+          const availableHours = indicators.reduce((s, i) => s + i.availableHours, 0);
+          const utilization =
+            indicators.length > 0
+              ? indicators.reduce((s, i) => s + i.utilization, 0) / indicators.length
+              : 0;
+          const status: "low" | "medium" | "high" =
+            utilization > 95 ? "high" : utilization >= 80 ? "medium" : "low";
+          return { scheduledHours, availableHours, utilization, status };
+        });
+        setYearWorkloadSummaries(summaries);
+      })
+      .catch((error) => {
+        console.error("Erro ao buscar carga do ano:", error);
+        setYearWorkloadSummaries(null);
+      })
+      .finally(() => setLoadingYearWorkload(false));
+  }, [effectiveCompanyId, currentDate, viewMode, apiContext]);
+
+  // Contagem de agendamentos (rotas e serviços) por mês do ano exibido
+  const scheduleCountsByMonth = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const counts = Array.from({ length: 12 }, () => ({ routeCount: 0, serviceCount: 0 }));
+    for (const s of schedules) {
+      const dateStr = s.type === "route" ? s.scheduledStartAt : s.scheduledStartAt;
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime()) || d.getFullYear() !== year) continue;
+      const monthIndex = d.getMonth();
+      if (s.type === "route") counts[monthIndex].routeCount += 1;
+      else counts[monthIndex].serviceCount += 1;
+    }
+    return counts;
+  }, [schedules, currentDate]);
+
+  // Resumo por mês para a visão anual (workload + contagens)
+  const monthlySummariesForYear = useMemo(() => {
+    if (!yearWorkloadSummaries || yearWorkloadSummaries.length !== 12) return null;
+    return yearWorkloadSummaries.map((w, i) => ({
+      ...w,
+      routeCount: scheduleCountsByMonth[i].routeCount,
+      serviceCount: scheduleCountsByMonth[i].serviceCount,
+    }));
+  }, [yearWorkloadSummaries, scheduleCountsByMonth]);
+
   // Navegação entre datas
   const handleNavigate = useCallback((action: "prev" | "next" | "today") => {
     if (action === "today") {
@@ -142,7 +212,9 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
       return;
     }
 
-    if (viewMode === "month") {
+    if (viewMode === "year") {
+      setCurrentDate(action === "prev" ? subYears(currentDate, 1) : addYears(currentDate, 1));
+    } else if (viewMode === "month") {
       setCurrentDate(action === "prev" ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
     } else if (viewMode === "week") {
       setCurrentDate(action === "prev" ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
@@ -158,19 +230,25 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
     setViewMode(newView);
   }, [currentDate]);
 
+  // Duração por rota (vinda dos agendamentos da API: durationMinutes)
+  const routeDurationByRouteId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of routeSchedules) {
+      const dur = (s as { durationMinutes?: number }).durationMinutes;
+      if (dur != null && !map.has(s.routeId)) map.set(s.routeId, dur);
+    }
+    return map;
+  }, [routeSchedules]);
+
   // Converter rotas e serviços para o formato esperado pelos componentes
   const planningRoutes = useMemo(() => {
-    return routes.map((route) => {
-      // Calcular duração da rota (soma dos tempos de execução dos serviços)
-      // Por enquanto, usar um valor padrão ou buscar RouteCipService
-      return {
-        id: route.id,
-        code: route.code,
-        name: route.name,
-        duration: 120, // 2 horas padrão (pode ser melhorado)
-      };
-    });
-  }, [routes]);
+    return routes.map((route) => ({
+      id: route.id,
+      code: route.code,
+      name: route.name,
+      duration: routeDurationByRouteId.get(route.id) ?? 120,
+    }));
+  }, [routes, routeDurationByRouteId]);
 
   const planningServices = useMemo(() => {
     return services.map((service) => ({
@@ -191,18 +269,19 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
     return schedules.map((schedule) => {
       if (schedule.type === "route") {
         const route = routes.find((r) => r.id === schedule.routeId);
+        const duration = schedule.durationMinutes ?? 120;
         return {
           id: schedule.id,
           type: "route" as const,
           routeId: schedule.routeId,
           scheduledStartAt: schedule.scheduledStartAt,
-          duration: 120, // TODO: Calcular duração real
+          duration,
           route: route
             ? {
                 id: route.id,
                 code: route.code,
                 name: route.name,
-                duration: 120,
+                duration,
               }
             : undefined,
         };
@@ -450,8 +529,19 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
             onRemoveSchedule={handleRemoveSchedule}
             onMoveSchedule={handleMoveSchedule}
           />
+        ) : viewMode === "year" ? (
+          <AdvancedAnnualView
+            displayDate={currentDate}
+            monthlySummaries={monthlySummariesForYear}
+            loadingYearWorkload={loadingYearWorkload}
+            onMonthClick={(firstDayOfMonth) => {
+              setCurrentDate(startOfDay(firstDayOfMonth));
+              setViewMode("month");
+            }}
+          />
         ) : (
           <AdvancedMonthlyCalendar
+            displayDate={currentDate}
             indicators={workloadIndicators}
             onDateClick={(dateKey) => {
               const [y, m, d] = dateKey.split("-").map(Number);

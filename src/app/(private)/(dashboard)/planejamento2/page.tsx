@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay } from "date-fns";
+import { addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, addYears, subYears, startOfDay } from "date-fns";
 import { Sparkles } from "lucide-react";
 import { AdvancedDayView } from "@/components/planning-advanced/AdvancedDayView";
 import { ImprovedWeekView } from "@/components/planning-advanced/ImprovedWeekView";
+import { AdvancedAnnualView } from "@/components/planning-advanced/AdvancedAnnualView";
 import { AdvancedMonthlyCalendar } from "@/components/planning-advanced/AdvancedMonthlyCalendar";
 import { PlanningToolbar, type PlanningView } from "@/components/planning-advanced/PlanningToolbar";
 import { AddScheduleModal } from "@/components/planning-advanced/AddScheduleModal";
@@ -51,7 +52,13 @@ export default function Planejamento2Page() {
       return;
     }
 
-    if (viewMode === "month") {
+    if (viewMode === "year") {
+      setCurrentDate(
+        action === "prev"
+          ? subYears(currentDate, 1)
+          : addYears(currentDate, 1)
+      );
+    } else if (viewMode === "month") {
       setCurrentDate(
         action === "prev"
           ? subMonths(currentDate, 1)
@@ -269,8 +276,17 @@ export default function Planejamento2Page() {
             onRemoveSchedule={handleRemoveSchedule}
             onMoveSchedule={handleMoveSchedule}
           />
+        ) : viewMode === "year" ? (
+          <AdvancedAnnualView
+            displayDate={currentDate}
+            onMonthClick={(firstDayOfMonth) => {
+              setCurrentDate(startOfDay(firstDayOfMonth));
+              setViewMode("month");
+            }}
+          />
         ) : (
           <AdvancedMonthlyCalendar
+            displayDate={currentDate}
             indicators={indicators}
             onDateClick={(dateKey) => {
               // Ao clicar em uma data no calendário mensal, mudar para diária e focar naquela data

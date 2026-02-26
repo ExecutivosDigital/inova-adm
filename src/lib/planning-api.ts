@@ -148,12 +148,8 @@ export function combineSchedules(
  */
 export function getScheduleDuration(schedule: PlanningScheduleItem): number {
   if (schedule.type === 'route') {
-    // Para rotas, precisamos somar os tempos de execução dos serviços
-    // Por enquanto, retornamos um valor padrão
-    // TODO: Buscar RouteCipService e somar executionTime
-    return 120; // 2 horas padrão
+    return schedule.durationMinutes ?? 120;
   } else {
-    // Para serviços, usar executionTime do cipService
-    return schedule.cipService?.executionTime?.minutes || 60; // 1 hora padrão
+    return schedule.cipService?.executionTime?.minutes || 60;
   }
 }

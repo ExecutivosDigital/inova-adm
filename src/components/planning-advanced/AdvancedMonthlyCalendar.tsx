@@ -3,9 +3,11 @@
 import type { WorkloadIndicator } from "@/lib/planning-advanced-types";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 interface AdvancedMonthlyCalendarProps {
+  /** Data que define o mês exibido (qualquer dia do mês). Controlado pelo pai para manter sincronia ao alternar visões. */
+  displayDate: Date;
   indicators: WorkloadIndicator[];
   onDateClick?: (date: string) => void;
   onMonthChange?: (date: Date) => void;
@@ -28,20 +30,13 @@ const MONTHS = [
 ];
 
 export function AdvancedMonthlyCalendar({
+  displayDate,
   indicators,
   onDateClick,
   onMonthChange,
 }: AdvancedMonthlyCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
-  // Notificar mudança de mês
-  const handleMonthChange = (newDate: Date) => {
-    setCurrentDate(newDate);
-    onMonthChange?.(newDate);
-  };
-  
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth() + 1;
+  const year = displayDate.getFullYear();
+  const month = displayDate.getMonth() + 1;
   
   const indicatorsMap = useMemo(() => {
     const map = new Map<string, WorkloadIndicator>();
@@ -72,17 +67,16 @@ export function AdvancedMonthlyCalendar({
   
   const goToPreviousMonth = () => {
     const newDate = new Date(year, month - 2, 1);
-    handleMonthChange(newDate);
+    onMonthChange?.(newDate);
   };
-  
+
   const goToNextMonth = () => {
     const newDate = new Date(year, month, 1);
-    handleMonthChange(newDate);
+    onMonthChange?.(newDate);
   };
-  
+
   const goToToday = () => {
-    const newDate = new Date();
-    handleMonthChange(newDate);
+    onMonthChange?.(new Date());
   };
   
   const getIndicatorForDay = (day: number | null): WorkloadIndicator | null => {
@@ -130,7 +124,7 @@ export function AdvancedMonthlyCalendar({
   };
   
   return (
-    <div className="flex h-full flex-col space-y-4 overflow-hidden">
+    <div className="flex h-full flex-col  overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-4">
           <button
@@ -196,7 +190,7 @@ export function AdvancedMonthlyCalendar({
               return (
                 <div
                   key={`empty-${index}`}
-                  className="aspect-square bg-slate-50 rounded border border-slate-100"
+                  className="aspect-[3/2] bg-slate-50 rounded border border-slate-100"
                 />
               );
             }
@@ -209,7 +203,7 @@ export function AdvancedMonthlyCalendar({
                 type="button"
                 onClick={() => onDateClick?.(dateKey)}
                 className={cn(
-                  "aspect-square rounded border-2 transition-all relative overflow-hidden",
+                  "aspect-[3/2] rounded border-2 transition-all relative overflow-hidden",
                   getStatusColor(status),
                   isTodayDay && "ring-2 ring-primary ring-offset-2",
                   indicator && "cursor-pointer hover:shadow-md"

@@ -129,6 +129,8 @@ export interface RouteScheduleItem {
   routeId: string;
   scheduledStartAt: string;
   route?: { id: string; name: string; code: string; companyId: string };
+  /** Soma dos minutos de execução dos serviços da rota (enviado pela API). */
+  durationMinutes?: number;
 }
 
 /** Agendamento de serviço individual com início em data/hora (resposta de GET /planning/schedules/:companyId). */

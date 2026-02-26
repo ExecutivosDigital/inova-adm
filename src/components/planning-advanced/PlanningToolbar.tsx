@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-export type PlanningView = "day" | "week" | "month";
+export type PlanningView = "day" | "week" | "month" | "year";
 
 interface PlanningToolbarProps {
   currentDate: Date;
@@ -18,6 +18,7 @@ const viewLabels: Record<PlanningView, string> = {
   day: "Dia",
   week: "Semana",
   month: "Mês",
+  year: "Ano",
 };
 
 export function PlanningToolbar({
@@ -27,6 +28,9 @@ export function PlanningToolbar({
   onViewChange,
 }: PlanningToolbarProps) {
   const getDateLabel = () => {
+    if (view === "year") {
+      return format(currentDate, "yyyy", { locale: ptBR });
+    }
     if (view === "month") {
       return format(currentDate, "MMMM yyyy", { locale: ptBR });
     }
