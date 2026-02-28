@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Route as RouteIcon, Wrench } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Eye, Plus, Trash2, Route as RouteIcon, Wrench } from "lucide-react";
 import { format, isSameDay, startOfDay, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import React, { useCallback, useMemo, useState } from "react";
@@ -24,6 +24,7 @@ import type {
   PlanningRoute,
   PlanningService,
 } from "@/lib/planning-advanced-types";
+import type { WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const BRAZIL_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -37,6 +38,10 @@ interface ImprovedWeekViewProps {
   onAddSchedule: (type: "route" | "service", dateKey: string, slotMin: number) => void;
   onRemoveSchedule: (scheduleId: string) => void;
   onMoveSchedule: (scheduleId: string, dateKey: string, slotMin: number) => void;
+  readOnly?: boolean;
+  onProgramar?: (schedule: ScheduleItem) => void;
+  workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[];
+  onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
 }
 
 function toBrazilLocal(utcDate: Date) {
@@ -80,6 +85,10 @@ export function ImprovedWeekView({
   onAddSchedule,
   onRemoveSchedule,
   onMoveSchedule,
+  readOnly = false,
+  onProgramar,
+  workOrdersForSchedule,
+  onViewWorkOrders,
 }: ImprovedWeekViewProps) {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeDragData, setActiveDragData] = useState<ScheduleDragData | null>(null);
@@ -152,37 +161,46 @@ export function ImprovedWeekView({
     [onMoveSchedule]
   );
 
+  const dayColumns = (
+    <div className="overflow-x-auto">
+      <div className="flex min-w-full gap-2 md:grid md:grid-cols-7">
+        {weekDays.map((day) => (
+          <DayColumn
+            key={dateToKey(day)}
+            day={day}
+            schedules={schedulesByDay.get(dateToKey(day)) || []}
+            isWorkDay={workDaysSet.has(day.getDay())}
+            companySchedule={companySchedule}
+            onAddSchedule={onAddSchedule}
+            onRemoveSchedule={onRemoveSchedule}
+            onMoveSchedule={onMoveSchedule}
+            movingScheduleId={movingScheduleId}
+            readOnly={readOnly}
+            onProgramar={onProgramar}
+            workOrdersForSchedule={workOrdersForSchedule}
+            onViewWorkOrders={onViewWorkOrders}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto">
-          <div className="flex min-w-full gap-2 md:grid md:grid-cols-7">
-            {weekDays.map((day) => {
-              return (
-                <DayColumn
-                  key={dateToKey(day)}
-                  day={day}
-                  schedules={schedulesByDay.get(dateToKey(day)) || []}
-                  isWorkDay={workDaysSet.has(day.getDay())}
-                  companySchedule={companySchedule}
-                  onAddSchedule={onAddSchedule}
-                  onRemoveSchedule={onRemoveSchedule}
-                  onMoveSchedule={onMoveSchedule}
-                  movingScheduleId={movingScheduleId}
-                />
-              );
-            })}
-          </div>
-        </div>
-
-        <DragOverlay>
-          {activeDragId && activeDragData ? (
-            <div className="rounded border-2 border-primary bg-primary/20 px-3 py-2 text-sm font-medium text-slate-900 shadow-lg cursor-grabbing">
-              Movendo...
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+      {readOnly ? (
+        dayColumns
+      ) : (
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          {dayColumns}
+          <DragOverlay>
+            {activeDragId && activeDragData ? (
+              <div className="rounded border-2 border-primary bg-primary/20 px-3 py-2 text-sm font-medium text-slate-900 shadow-lg cursor-grabbing">
+                Movendo...
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      )}
     </div>
   );
 }
@@ -196,6 +214,10 @@ function DayColumn({
   onRemoveSchedule,
   onMoveSchedule,
   movingScheduleId,
+  readOnly = false,
+  onProgramar,
+  workOrdersForSchedule,
+  onViewWorkOrders,
 }: {
   day: Date;
   schedules: ScheduleItem[];
@@ -205,18 +227,21 @@ function DayColumn({
   onRemoveSchedule: (scheduleId: string) => void;
   onMoveSchedule: (scheduleId: string, dateKey: string, slotMin: number) => void;
   movingScheduleId: string | null;
+  readOnly?: boolean;
+  onProgramar?: (schedule: ScheduleItem) => void;
+  workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[];
+  onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
 }) {
   const dateKey = dateToKey(day);
   const isToday = isSameDay(day, new Date());
 
-  // Ordenar por horário
   const sortedSchedules = [...schedules].sort((a, b) => {
     const dateA = new Date(a.scheduledStartAt);
     const dateB = new Date(b.scheduledStartAt);
     return dateA.getTime() - dateB.getTime();
   });
 
-  const { setNodeRef, isOver } = useDroppable({
+  const droppable = useDroppable({
     id: `day-${dateKey}`,
     data: {
       dateKey,
@@ -226,13 +251,13 @@ function DayColumn({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={readOnly ? undefined : droppable.setNodeRef}
       className={cn(
         "min-w-[280px] flex-shrink-0 flex flex-col rounded-lg border bg-white md:min-w-0",
         isToday && "border-primary bg-primary/5",
         !isToday && isWorkDay && "border-slate-200",
         !isWorkDay && "border-slate-100 bg-slate-50",
-        isOver && isWorkDay && "ring-2 ring-primary/50"
+        !readOnly && droppable.isOver && isWorkDay && "ring-2 ring-primary/50"
       )}
     >
       {/* Cabeçalho do dia */}
@@ -271,6 +296,28 @@ function DayColumn({
                   Nenhum agendamento
                 </p>
               </div>
+            ) : readOnly ? (
+              sortedSchedules.map((schedule) => {
+                const isRoute = schedule.type === "route";
+                const displayName = isRoute
+                  ? `${schedule.route?.code} – ${schedule.route?.name}`
+                  : `${schedule.service?.name} (${schedule.service?.equipmentName})`;
+                const scheduleDate = new Date(schedule.scheduledStartAt);
+                const br = toBrazilLocal(scheduleDate);
+                const timeStr = `${String(br.hours).padStart(2, "0")}:${String(br.minutes).padStart(2, "0")}`;
+                return (
+                  <ReadOnlyScheduleCard
+                    key={schedule.id}
+                    schedule={schedule}
+                    timeStr={timeStr}
+                    displayName={displayName}
+                    isRoute={isRoute}
+                    onProgramar={onProgramar}
+                    workOrders={workOrdersForSchedule?.(schedule) ?? []}
+                    onViewWorkOrders={onViewWorkOrders}
+                  />
+                );
+              })
             ) : (
               sortedSchedules.map((schedule) => {
                 const isRoute = schedule.type === "route";
@@ -304,17 +351,19 @@ function DayColumn({
                 );
               })
             )}
-            <button
-              type="button"
-              onClick={() => {
-                const startMin = parseTimeToMinutes(companySchedule.businessHoursStart);
-                onAddSchedule("route", dateKey, startMin);
-              }}
-              className="mt-2 shrink-0 flex items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-2 px-3 text-xs font-medium text-slate-600 hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Adicionar agendamento
-            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  const startMin = parseTimeToMinutes(companySchedule.businessHoursStart);
+                  onAddSchedule("route", dateKey, startMin);
+                }}
+                className="mt-2 shrink-0 flex items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-2 px-3 text-xs font-medium text-slate-600 hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Adicionar agendamento
+              </button>
+            )}
           </>
         )}
       </div>
@@ -325,6 +374,57 @@ function DayColumn({
 function parseTimeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+}
+
+function ReadOnlyScheduleCard({
+  schedule,
+  timeStr,
+  displayName,
+  isRoute,
+  onProgramar,
+}: {
+  schedule: ScheduleItem;
+  timeStr: string;
+  displayName: string;
+  isRoute: boolean;
+  onProgramar?: (schedule: ScheduleItem) => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-2.5 transition-all",
+        isRoute ? "border-primary/40 bg-primary/10" : "border-green-500/40 bg-green-50"
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          {isRoute ? (
+            <RouteIcon className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+          ) : (
+            <Wrench className="h-3.5 w-3.5 shrink-0 text-green-600 mt-0.5" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-slate-900 truncate">{displayName}</p>
+            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              <span>{timeStr}</span>
+              <span>•</span>
+              <span>{formatDuration(schedule.duration)}</span>
+            </div>
+          </div>
+        </div>
+        {onProgramar && (
+          <button
+            type="button"
+            onClick={() => onProgramar(schedule)}
+            title="Programar"
+            className="shrink-0 rounded border border-primary bg-white p-1.5 text-primary hover:bg-primary/5"
+          >
+            <CalendarPlus className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function DraggableScheduleCard({

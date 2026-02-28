@@ -40,7 +40,7 @@ interface AdvancedAnnualViewProps {
 }
 
 function getStatusColor(status: MonthSummary["status"] | null) {
-  if (!status) return "border-slate-200 bg-slate-50";
+  if (!status) return "border-blue-200 bg-blue-50/80";
   switch (status) {
     case "low":
       return "border-green-200 bg-green-50/80";
@@ -49,12 +49,12 @@ function getStatusColor(status: MonthSummary["status"] | null) {
     case "high":
       return "border-red-200 bg-red-50/80";
     default:
-      return "border-slate-200 bg-slate-50";
+      return "border-blue-200 bg-blue-50/80";
   }
 }
 
 function getStatusDot(status: MonthSummary["status"] | null) {
-  if (!status) return "bg-slate-300";
+  if (!status) return "bg-blue-500";
   switch (status) {
     case "low":
       return "bg-green-500";
@@ -63,7 +63,7 @@ function getStatusDot(status: MonthSummary["status"] | null) {
     case "high":
       return "bg-red-500";
     default:
-      return "bg-slate-300";
+      return "bg-blue-500";
   }
 }
 
@@ -178,6 +178,10 @@ export function AdvancedAnnualView({
 
       {/* Legenda (igual à visão mensal) */}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-6 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-full bg-blue-500" />
+          <span>Período vazio</span>
+        </div>
         <div className="flex items-center gap-2">
           <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
           <span>Carga adequada (&lt; 80%)</span>
