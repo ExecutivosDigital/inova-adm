@@ -34,7 +34,7 @@ const menuItems = [
   { icon: Route, label: "Planejamento", href: "/planejamento", enabled: true },
   { icon: CalendarDays, label: "Programação", href: "/programacao", enabled: false },
   // { icon: CalendarDays, label: "Programação 2", href: "/programacao2", enabled: true },
-  { icon: UsersRound, label: "Equipes", href: "/equipes", enabled: true },
+  { icon: UsersRound, label: "Equipes", href: "/equipes", enabled: false },
   { icon: Users, label: "Pessoas", href: "/pessoas", enabled: false },
   { icon: Settings, label: "Configurações", href: "/configuracoes", enabled: false },
 ];
