@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { CalendarPlus, CheckCircle2, Eye, Plus, Trash2, Route as RouteIcon, Wrench } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Eye, FileText, Plus, Trash2, Route as RouteIcon, Wrench } from "lucide-react";
 import { format, isSameDay, startOfDay, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import React, { useCallback, useMemo, useState } from "react";
@@ -382,12 +382,16 @@ function ReadOnlyScheduleCard({
   displayName,
   isRoute,
   onProgramar,
+  workOrders = [],
+  onViewWorkOrders,
 }: {
   schedule: ScheduleItem;
   timeStr: string;
   displayName: string;
   isRoute: boolean;
   onProgramar?: (schedule: ScheduleItem) => void;
+  workOrders?: WorkOrderSummary[];
+  onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
 }) {
   return (
     <div
@@ -412,16 +416,28 @@ function ReadOnlyScheduleCard({
             </div>
           </div>
         </div>
-        {onProgramar && (
-          <button
-            type="button"
-            onClick={() => onProgramar(schedule)}
-            title="Programar"
-            className="shrink-0 rounded border border-primary bg-white p-1.5 text-primary hover:bg-primary/5"
-          >
-            <CalendarPlus className="h-3.5 w-3.5" />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {onViewWorkOrders && workOrders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onViewWorkOrders(workOrders)}
+              title="Ver ordens de serviço"
+              className="rounded border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
+            >
+              <FileText className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {onProgramar && (
+            <button
+              type="button"
+              onClick={() => onProgramar(schedule)}
+              title="Programar"
+              className="rounded border border-primary bg-white p-1.5 text-primary hover:bg-primary/5"
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
