@@ -1,10 +1,14 @@
+export interface WorkerRoleFromApi {
+  id: string;
+  name: string;
+}
+
 export interface TeamFromApi {
   id: string;
   name: string;
-  membersCount?: number | null;
-  members?: string[];
   createdAt?: string;
-  workerIds: string[];
+  workerRoleIds: string[];
+  workerRoles?: WorkerRoleFromApi[];
 }
 
 export interface WorkerFromApi {

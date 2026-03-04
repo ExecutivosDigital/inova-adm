@@ -20,8 +20,7 @@ import {
   Route,
   Settings,
   Users,
-  UsersRound,
-  Wrench,
+  Wrench
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -34,7 +33,6 @@ const menuItems = [
   { icon: Route, label: "Planejamento", href: "/planejamento", enabled: true },
   { icon: CalendarDays, label: "Programação", href: "/programacao", enabled: true },
   // { icon: CalendarDays, label: "Programação 2", href: "/programacao2", enabled: true },
-  { icon: UsersRound, label: "Equipes", href: "/equipes", enabled: true },
   { icon: Users, label: "Pessoas", href: "/pessoas", enabled: false },
   { icon: Settings, label: "Configurações", href: "/configuracoes", enabled: false },
 ];
