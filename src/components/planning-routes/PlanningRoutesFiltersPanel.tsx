@@ -3,7 +3,7 @@
 import { MultiSelectDropdown } from "@/components/ui/multi-select-dropdown";
 import { useFilterCatalogs } from "@/hooks/useFilterCatalogs";
 import type { FilterServicesPayload } from "@/lib/route-types";
-import { Loader2, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 interface PlanningRoutesFiltersPanelProps {
@@ -118,19 +118,6 @@ export function PlanningRoutesFiltersPanel({
 
   return (
     <div className="space-y-4">
-      {onClose && (
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="text-sm font-semibold text-slate-900">Filtros de serviços</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
       <p className="text-xs text-slate-500">
         Filtre por dados do serviço (período, prioridade, time, modelo, EPI, toolkit, etc.) e por
         equipamento (setor, tipo, fabricante, centro de custo, condição de segurança, lubrificação,
@@ -212,11 +199,11 @@ export function PlanningRoutesFiltersPanel({
         )}
         {catalogs.serviceModels.length > 0 && (
           <MultiSelectDropdown
-              label="Modelo de serviço"
+              label="Serviço"
               items={catalogs.serviceModels}
               selectedIds={draft.serviceModelIds ?? []}
               onToggle={(id, checked) => toggleArray("serviceModelIds", id, checked)}
-              searchPlaceholder="Buscar modelo..."
+              searchPlaceholder="Buscar serviço..."
           />
         )}
         {catalogs.epis.length > 0 && (

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import { CookiesProvider } from "next-client-cookies/server";
 import { ContextProviders } from "@/context/ContextProviders";
 import "./globals.css";
 
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={`${poppins.variable} font-sans antialiased`}>
-        <ContextProviders>{children}</ContextProviders>
+        <CookiesProvider>
+          <ContextProviders>{children}</ContextProviders>
+        </CookiesProvider>
       </body>
     </html>
   );

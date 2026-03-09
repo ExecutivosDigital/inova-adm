@@ -3,6 +3,7 @@
 import { useApiContext } from "@/context/ApiContext";
 import { useAuth } from "@/context/AuthContext";
 import { decodeJwtPayload, isSuperAdmin } from "@/lib/jwt";
+import toast from "react-hot-toast";
 import {
   createContext,
   useCallback,
@@ -83,6 +84,8 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             }
             return current;
           });
+        } else {
+          toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar empresas.");
         }
       })
       .finally(() => {

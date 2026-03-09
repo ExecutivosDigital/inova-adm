@@ -1,7 +1,7 @@
 "use client";
 
 import type { Route } from "@/lib/route-types";
-import { Route as RouteIcon, X } from "lucide-react";
+import { Plus, Route as RouteIcon, X } from "lucide-react";
 import { useState } from "react";
 
 interface RouteSelectModalProps {
@@ -10,6 +10,8 @@ interface RouteSelectModalProps {
   routes: Route[];
   selectedServiceIds: string[];
   onConfirm: (routeId: string) => Promise<void>;
+  /** Se informado, exibe botão "Criar nova rota" que chama este callback e fecha o modal */
+  onCreateNew?: () => void;
 }
 
 export function RouteSelectModal({
@@ -18,6 +20,7 @@ export function RouteSelectModal({
   routes,
   selectedServiceIds,
   onConfirm,
+  onCreateNew,
 }: RouteSelectModalProps) {
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -67,6 +70,20 @@ export function RouteSelectModal({
           <p className="text-sm text-slate-600">
             {selectedServiceIds.length} serviço(s) selecionado(s). Escolha a rota para adicionar:
           </p>
+
+          {onCreateNew && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onCreateNew();
+              }}
+              className="flex w-full items-center gap-2 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+            >
+              <Plus className="h-4 w-4" />
+              Criar nova rota
+            </button>
+          )}
 
           {routes.length === 0 ? (
             <p className="text-sm text-slate-500">Nenhuma rota cadastrada.</p>

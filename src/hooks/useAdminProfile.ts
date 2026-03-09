@@ -3,6 +3,7 @@
 import { useApiContext } from "@/context/ApiContext";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 export interface AdminProfile {
   id: string;
@@ -31,6 +32,9 @@ export function useAdminProfile() {
         setProfile((res.body as { admin: AdminProfile }).admin);
       } else {
         setProfile(null);
+        if (res.status !== 401) {
+          toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar perfil.");
+        }
       }
     } catch {
       setProfile(null);

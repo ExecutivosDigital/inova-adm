@@ -27,6 +27,9 @@ export interface ScheduleItem {
   duration: number; // minutos
   route?: PlanningRoute;
   service?: PlanningService;
+  /** IDs dos workers vinculados (definidos na etapa de planejamento) */
+  assignedWorkerIds?: string[];
+  assignedWorkers?: Array<{ id: string; name: string }>;
 }
 
 export interface WorkloadIndicator {

@@ -19,6 +19,8 @@ export interface Route {
   finishedAt?: string | null;
   isTemporary: boolean;
   companyId: string;
+  routePeriodId?: string | null;
+  period?: { id: string; name: string; days?: number } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,7 +52,11 @@ export interface CipService {
   serviceModel?: { id: string; name: string; description?: string | null };
   period?: { id: string; name: string; days?: number | null };
   priority?: { id: string; name: string };
-  team?: { id: string; name: string };
+  team?: {
+    id: string;
+    name: string;
+    teamWorkerRoles?: Array<{ workerRoleId: string; workerRole: { id: string; name: string } }>;
+  };
   serviceCondition?: { id: string; name: string };
   jobSystem?: { id: string; name: string };
   executionTime?: { id: string; name: string; minutes?: number };
@@ -131,6 +137,8 @@ export interface RouteScheduleItem {
   route?: { id: string; name: string; code: string; companyId: string };
   /** Soma dos minutos de execução dos serviços da rota (enviado pela API). */
   durationMinutes?: number;
+  assignedWorkerIds?: string[];
+  assignedWorkers?: Array<{ id: string; name: string }>;
 }
 
 /** Agendamento de serviço individual com início em data/hora (resposta de GET /planning/schedules/:companyId). */
@@ -138,6 +146,8 @@ export interface ServiceScheduleItem {
   id: string;
   cipServiceId: string;
   scheduledStartAt: string;
+  assignedWorkerIds?: string[];
+  assignedWorkers?: Array<{ id: string; name: string }>;
   cipService?: CipService & {
     executionTime?: { id: string; name: string; minutes: number } | null;
     period?: { id: string; name: string; days: number } | null;
@@ -161,6 +171,8 @@ export interface WorkloadIndicator {
 /** Payload para POST /filter-services */
 export interface FilterServicesPayload {
   companyId?: string;
+  page?: number;
+  limit?: number;
   periodIds?: string[];
   priorityIds?: string[];
   teamIds?: string[];
@@ -181,4 +193,6 @@ export interface FilterServicesPayload {
   lubricationSystemIds?: string[];
   mainComponentIds?: string[];
   powerUnitIds?: string[];
+  /** Se true, exclui serviços que já possuem serviceSchedule (usado na tela de planejamento adm) */
+  excludeWithServiceSchedule?: boolean;
 }

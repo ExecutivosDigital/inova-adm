@@ -4,31 +4,36 @@ import { AddScheduleModal } from "@/components/planning-advanced/AddScheduleModa
 import { AdvancedAnnualView } from "@/components/planning-advanced/AdvancedAnnualView";
 import { AdvancedDayView } from "@/components/planning-advanced/AdvancedDayView";
 import { AdvancedMonthlyCalendar } from "@/components/planning-advanced/AdvancedMonthlyCalendar";
+import { AssignWorkersModal } from "@/components/planning-advanced/AssignWorkersModal";
 import { AutoGenerateModal } from "@/components/planning-advanced/AutoGenerateModal";
 import { ImprovedWeekView } from "@/components/planning-advanced/ImprovedWeekView";
 import { PlanningToolbar, type PlanningView } from "@/components/planning-advanced/PlanningToolbar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
+import type { ScheduleItem } from "@/lib/planning-advanced-types";
 import {
-  autoGeneratePlanning,
-  combineSchedules,
-  createServiceSchedule,
-  deleteServiceSchedule,
-  fetchSchedules,
-  fetchWorkload,
-  updateServiceSchedule
+    autoGeneratePlanning,
+    combineSchedules,
+    createServiceSchedule,
+    deleteServiceSchedule,
+    fetchSchedules,
+    fetchWorkload,
+    updateServiceSchedule
 } from "@/lib/planning-api";
 import type {
-  CipService,
-  CompanySchedule,
-  Route,
-  RouteScheduleItem,
-  ServiceScheduleItem,
-  WorkloadIndicator
+    CipService,
+    CompanySchedule,
+    Route,
+    RouteCipServiceItem,
+    RouteScheduleItem,
+    ServiceScheduleItem,
+    WorkloadIndicator
 } from "@/lib/route-types";
 import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
-import { Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 interface PlanningCalendarContainerProps {
   // Props podem ser vazias, tudo vem do contexto
@@ -44,6 +49,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
   const [serviceSchedules, setServiceSchedules] = useState<ServiceScheduleItem[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [services, setServices] = useState<CipService[]>([]);
+  const [routeCipServices, setRouteCipServices] = useState<RouteCipServiceItem[]>([]);
   const [companySchedule, setCompanySchedule] = useState<CompanySchedule | null>(null);
   const [workloadIndicators, setWorkloadIndicators] = useState<WorkloadIndicator[]>([]);
   const [yearWorkloadSummaries, setYearWorkloadSummaries] = useState<
@@ -58,9 +64,13 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAutoGenerateModal, setShowAutoGenerateModal] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [addDefaultDateKey, setAddDefaultDateKey] = useState<string | undefined>();
   const [addDefaultSlotMin, setAddDefaultSlotMin] = useState<number | undefined>();
   const [addDefaultType, setAddDefaultType] = useState<"route" | "service">("route");
+  const [scheduleForAssignWorkers, setScheduleForAssignWorkers] = useState<ScheduleItem | null>(null);
+  /** Lanes preferidas por scheduleId (preserva coluna ao mover na visão de dia) */
+  const [scheduleLanes, setScheduleLanes] = useState<Record<string, number>>({});
 
   // Combinar agendamentos
   const schedules = useMemo(
@@ -75,6 +85,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
       setServiceSchedules([]);
       setRoutes([]);
       setServices([]);
+      setRouteCipServices([]);
       setCompanySchedule(null);
       setLoading(false);
       return;
@@ -82,12 +93,12 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
 
     setLoading(true);
     try {
-      // Buscar agendamentos, rotas, serviços e configurações da empresa
-      const [schedulesResult, companyRes, routesRes, servicesRes] = await Promise.all([
+      const [schedulesResult, companyRes, routesRes, servicesRes, routeServicesRes] = await Promise.all([
         fetchSchedules(effectiveCompanyId, apiContext),
         apiContext.GetAPI(`/company/${effectiveCompanyId}`, true),
         apiContext.GetAPI(isSuperAdmin ? `/route?companyId=${effectiveCompanyId}` : "/route", true),
         apiContext.PostAPI(`/filter-services`, { companyId: effectiveCompanyId }, true),
+        apiContext.GetAPI(`/route/company/${effectiveCompanyId}/route-services`, true),
       ]);
 
       console.log("schedulesResult", schedulesResult);
@@ -108,6 +119,9 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
 
       if (servicesRes.status === 200 && servicesRes.body?.cipServices) {
         setServices(servicesRes.body.cipServices as CipService[]);
+      }
+      if (routeServicesRes.status === 200 && routeServicesRes.body?.routeCipServices) {
+        setRouteCipServices(routeServicesRes.body.routeCipServices as RouteCipServiceItem[]);
       }
 
       // Buscar indicadores de carga para o mês atual
@@ -195,14 +209,20 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
     return counts;
   }, [schedules, currentDate]);
 
-  // Resumo por mês para a visão anual (workload + contagens)
+  // Resumo por mês para a visão anual (workload + contagens). Meses sem planejamento (0 rotas e 0 serviços) ficam null → azul na visão.
   const monthlySummariesForYear = useMemo(() => {
     if (!yearWorkloadSummaries || yearWorkloadSummaries.length !== 12) return null;
-    return yearWorkloadSummaries.map((w, i) => ({
-      ...w,
-      routeCount: scheduleCountsByMonth[i].routeCount,
-      serviceCount: scheduleCountsByMonth[i].serviceCount,
-    }));
+    return yearWorkloadSummaries.map((w, i) => {
+      const routeCount = scheduleCountsByMonth[i].routeCount;
+      const serviceCount = scheduleCountsByMonth[i].serviceCount;
+      const hasNoPlanning = routeCount === 0 && serviceCount === 0;
+      if (hasNoPlanning) return null;
+      return {
+        ...w,
+        routeCount,
+        serviceCount,
+      };
+    });
   }, [yearWorkloadSummaries, scheduleCountsByMonth]);
 
   // Navegação entre datas
@@ -264,9 +284,14 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
     }));
   }, [services]);
 
-  // Converter agendamentos para o formato esperado
+  // Converter agendamentos para o formato esperado (inclui assignedWorkerIds do planejamento)
   const scheduleItems = useMemo(() => {
     return schedules.map((schedule) => {
+      const raw = schedule as { assignedWorkerIds?: string[]; assignedWorkers?: Array<{ id: string; name: string }> };
+      const base = {
+        assignedWorkerIds: raw.assignedWorkerIds ?? [],
+        assignedWorkers: raw.assignedWorkers ?? [],
+      };
       if (schedule.type === "route") {
         const route = routes.find((r) => r.id === schedule.routeId);
         const duration = schedule.durationMinutes ?? 120;
@@ -276,6 +301,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           routeId: schedule.routeId,
           scheduledStartAt: schedule.scheduledStartAt,
           duration,
+          ...base,
           route: route
             ? {
                 id: route.id,
@@ -293,6 +319,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           serviceId: schedule.cipServiceId,
           scheduledStartAt: schedule.scheduledStartAt,
           duration: schedule.cipService?.executionTime?.minutes || 60,
+          ...base,
           service: service
             ? {
                 id: service.id,
@@ -309,6 +336,40 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
       }
     });
   }, [schedules, routes, services]);
+
+  const { eligibleWorkerRoleIdsForAssign, eligibleWorkerRoleNamesForAssign } = useMemo(() => {
+    const roleIds = new Set<string>();
+    const roleNamesById = new Map<string, string>();
+    const addRole = (id: string, name: string) => {
+      if (!id) return;
+      roleIds.add(id);
+      if (name) roleNamesById.set(id, name);
+    };
+    if (!scheduleForAssignWorkers) {
+      return { eligibleWorkerRoleIdsForAssign: [], eligibleWorkerRoleNamesForAssign: [] };
+    }
+    if (scheduleForAssignWorkers.type === "route" && scheduleForAssignWorkers.routeId) {
+      const items = routeCipServices.filter((rcs) => rcs.routeId === scheduleForAssignWorkers.routeId);
+      for (const rcs of items) {
+        const cip = rcs.cipService ?? services.find((s) => s.id === rcs.cipServiceId);
+        cip?.team?.teamWorkerRoles?.forEach((twr) => {
+          const id = twr.workerRole?.id ?? (twr as { workerRoleId?: string }).workerRoleId;
+          const name = twr.workerRole?.name ?? (twr as { workerRole?: { name?: string } }).workerRole?.name;
+          addRole(id, name ?? "");
+        });
+      }
+    } else if (scheduleForAssignWorkers.type === "service" && scheduleForAssignWorkers.serviceId) {
+      const cip = services.find((s) => s.id === scheduleForAssignWorkers.serviceId);
+      cip?.team?.teamWorkerRoles?.forEach((twr) => {
+        const id = twr.workerRole?.id ?? (twr as { workerRoleId?: string }).workerRoleId;
+        const name = twr.workerRole?.name ?? (twr as { workerRole?: { name?: string } }).workerRole?.name;
+        addRole(id, name ?? "");
+      });
+    }
+    const ids = Array.from(roleIds);
+    const names = ids.map((id) => roleNamesById.get(id)).filter((n): n is string => Boolean(n?.trim()));
+    return { eligibleWorkerRoleIdsForAssign: ids, eligibleWorkerRoleNamesForAssign: names };
+  }, [scheduleForAssignWorkers, routeCipServices, services]);
 
   // Handlers
   const handleAddScheduleClick = useCallback(
@@ -352,9 +413,10 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
         setShowAddModal(false);
         setAddDefaultDateKey(undefined);
         setAddDefaultSlotMin(undefined);
+        toast.success("Agendamento criado com sucesso.");
       } catch (error) {
         console.error("Erro ao criar agendamento:", error);
-        alert("Erro ao criar agendamento. Tente novamente.");
+        toast.error(error instanceof Error ? error.message : "Erro ao criar agendamento. Tente novamente.");
       } finally {
         setLoading(false);
       }
@@ -377,9 +439,10 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           await apiContext.DeleteAPI(isSuperAdmin ? `/route/schedule/${scheduleId}?companyId=${effectiveCompanyId}` : `/route/schedule/${scheduleId}`, true);
         }
         await fetchData();
+        toast.success("Agendamento removido.");
       } catch (error) {
         console.error("Erro ao remover agendamento:", error);
-        alert("Erro ao remover agendamento. Tente novamente.");
+        toast.error(error instanceof Error ? error.message : "Erro ao remover agendamento. Tente novamente.");
       } finally {
         setLoading(false);
       }
@@ -388,11 +451,15 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
   );
 
   const handleMoveSchedule = useCallback(
-    async (scheduleId: string, dateKey: string, slotMin: number) => {
+    async (scheduleId: string, dateKey: string, slotMin: number, laneIndex?: number) => {
       if (!effectiveCompanyId) return;
 
       const schedule = schedules.find((s) => s.id === scheduleId);
       if (!schedule) return;
+
+      if (laneIndex != null) {
+        setScheduleLanes((prev) => ({ ...prev, [scheduleId]: laneIndex }));
+      }
 
       const [y, m, d] = dateKey.split("-").map(Number);
       const h = Math.floor(slotMin / 60);
@@ -409,8 +476,11 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
             apiContext
           );
         } else {
-          // Atualizar agendamento de rota (usar endpoint existente se houver, senão deletar e recriar)
-          await apiContext.DeleteAPI(`/route/schedule/${scheduleId}`, true);
+          // Mover rota: deletar o agendamento antigo e criar outro na nova data (backend não tem PUT para route schedule)
+          const deleteUrl = isSuperAdmin
+            ? `/route/schedule/${scheduleId}?companyId=${effectiveCompanyId}`
+            : `/route/schedule/${scheduleId}`;
+          await apiContext.DeleteAPI(deleteUrl, true);
           await apiContext.PostAPI(
             "/route/schedule",
             {
@@ -422,9 +492,10 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           );
         }
         await fetchData();
+        toast.success("Agendamento movido com sucesso.");
       } catch (error) {
         console.error("Erro ao mover agendamento:", error);
-        alert("Erro ao mover agendamento. Tente novamente.");
+        toast.error(error instanceof Error ? error.message : "Erro ao mover agendamento. Tente novamente.");
       } finally {
         setLoading(false);
       }
@@ -438,7 +509,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
 
       setLoading(true);
       try {
-        await autoGeneratePlanning(
+        const result = await autoGeneratePlanning(
           {
             ...options,
             companyId: isSuperAdmin ? effectiveCompanyId : undefined,
@@ -447,10 +518,21 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
         );
         await fetchData();
         setShowAutoGenerateModal(false);
-        alert("Planejamento gerado com sucesso!");
+        const skipped = result.skipped ?? 0;
+        if (skipped > 0) {
+          toast.success(
+            `${result.created} agendamento(s) criado(s). ${skipped} já existiam no período e foram ignorados.`
+          );
+        } else {
+          toast.success(
+            result.created > 0
+              ? `${result.created} agendamento(s) criado(s) com sucesso!`
+              : "Planejamento gerado (nenhum agendamento novo no período)."
+          );
+        }
       } catch (error) {
         console.error("Erro ao gerar planejamento:", error);
-        alert("Erro ao gerar planejamento. Tente novamente.");
+        toast.error(error instanceof Error ? error.message : "Erro ao gerar planejamento. Tente novamente.");
       } finally {
         setLoading(false);
       }
@@ -494,14 +576,31 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
             onNavigate={handleNavigate}
             onViewChange={handleViewChange}
           />
-          <button
-            type="button"
-            onClick={() => setShowAutoGenerateModal(true)}
-            className="flex items-center gap-2 rounded border border-primary bg-white px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 sm:px-4 sm:py-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            Gerar Planejamento Automático
-          </button>
+          <Popover open={actionsMenuOpen} onOpenChange={setActionsMenuOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 sm:px-3"
+                aria-label="Ações do calendário"
+              >
+                Ações
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setActionsMenuOpen(false);
+                  setShowAutoGenerateModal(true);
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-100"
+              >
+                <Sparkles className="h-4 w-4 text-primary" />
+                Gerar Planejamento Automático
+              </button>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
@@ -517,6 +616,8 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
             onAddSchedule={handleAddScheduleClick}
             onRemoveSchedule={handleRemoveSchedule}
             onMoveSchedule={handleMoveSchedule}
+            onAssignWorkers={setScheduleForAssignWorkers}
+            scheduleLanes={scheduleLanes}
           />
         ) : viewMode === "week" ? (
           <ImprovedWeekView
@@ -528,6 +629,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
             onAddSchedule={handleAddScheduleClick}
             onRemoveSchedule={handleRemoveSchedule}
             onMoveSchedule={handleMoveSchedule}
+            onAssignWorkers={setScheduleForAssignWorkers}
           />
         ) : viewMode === "year" ? (
           <AdvancedAnnualView
@@ -543,6 +645,11 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           <AdvancedMonthlyCalendar
             displayDate={currentDate}
             indicators={workloadIndicators}
+            schedules={scheduleItems}
+            companySchedule={companyScheduleFormatted}
+            onMoveSchedule={handleMoveSchedule}
+            onRemoveSchedule={handleRemoveSchedule}
+            onAssignWorkers={setScheduleForAssignWorkers}
             onDateClick={(dateKey) => {
               const [y, m, d] = dateKey.split("-").map(Number);
               const date = new Date(y, m - 1, d);
@@ -576,8 +683,19 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
       <AutoGenerateModal
         open={showAutoGenerateModal}
         onClose={() => setShowAutoGenerateModal(false)}
+        existingSchedules={schedules}
         onGenerate={handleAutoGenerate}
         loading={loading}
+      />
+
+      <AssignWorkersModal
+        open={scheduleForAssignWorkers != null}
+        onClose={() => setScheduleForAssignWorkers(null)}
+        schedule={scheduleForAssignWorkers}
+        companyId={effectiveCompanyId ?? null}
+        eligibleWorkerRoleIds={eligibleWorkerRoleIdsForAssign}
+        eligibleWorkerRoleNames={eligibleWorkerRoleNamesForAssign}
+        onSaved={fetchData}
       />
     </div>
   );

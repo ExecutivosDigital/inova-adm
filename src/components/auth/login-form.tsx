@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Controller, useForm } from "react-hook-form";
+import toast from "react-hot-toast";
 import { z } from "zod";
 
 interface LoginDataProps {
@@ -105,20 +106,23 @@ export default function LoginForm() {
 
         if (!accessToken) {
           setError("Resposta inválida do servidor");
+          toast.error("Resposta inválida do servidor");
           return;
         }
 
         await signIn(accessToken);
         reset();
+        toast.success("Login realizado com sucesso.");
         router.push("/planejamento");
       } else {
-        setError(
-          response.body?.message || "Erro ao fazer login. Verifique suas credenciais.",
-        );
+        const msg = (response.body as { message?: string })?.message || "Erro ao fazer login. Verifique suas credenciais.";
+        setError(msg);
+        toast.error(msg);
       }
     } catch (error) {
       console.error("🔴 Erro inesperado:", error);
       setError("Erro de conexão. Tente novamente.");
+      toast.error("Erro de conexão. Tente novamente.");
     } finally {
       setIsLoading(false);
     }

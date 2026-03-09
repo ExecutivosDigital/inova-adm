@@ -130,7 +130,7 @@ export function AddScheduleModal({
                   }}
                   className="text-primary"
                 />
-                <Wrench className="h-4 w-4 text-green-600" />
+                <Wrench className="h-4 w-4 text-primary" />
                 <span className="text-sm">Serviço Individual</span>
               </label>
             </div>

@@ -287,7 +287,7 @@ function DraggableScheduleCard({
           {isRoute ? (
             <RouteIcon className="h-3 w-3 shrink-0 text-primary" />
           ) : (
-            <Wrench className="h-3 w-3 shrink-0 text-green-600" />
+            <Wrench className="h-3 w-3 shrink-0 text-primary" />
           )}
           <span className="truncate font-medium text-slate-900 text-xs">{displayName}</span>
         </div>
@@ -555,7 +555,7 @@ export function AdvancedWeeklyCalendar({
                           "pointer-events-auto flex w-full min-w-0 cursor-grab rounded border px-2 py-1 text-xs overflow-hidden active:cursor-grabbing",
                           schedule.type === "route"
                             ? "border-primary/40 bg-primary/10"
-                            : "border-green-500/40 bg-green-50"
+                            : "border-primary/40 bg-primary/10"
                         )}
                       />
                     );

@@ -25,6 +25,7 @@ import { formatExecutionMinutes, totalExecutionMinutes } from "@/lib/route-types
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const SLOT_MINUTES = 30;
@@ -337,7 +338,6 @@ export function PlanningRoutesCalendar() {
   const [addDefaultSlotMin, setAddDefaultSlotMin] = useState<number | null>(null);
   const [addingRouteId, setAddingRouteId] = useState<string | null>(null);
   const [movingScheduleId, setMovingScheduleId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const slotGridRef = useRef<HTMLDivElement>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -470,13 +470,10 @@ export function PlanningRoutesCalendar() {
       setAddDefaultDateKey(null);
       setAddDefaultSlotMin(null);
       if (res.status === 200 || res.status === 201) {
-        setToast({ type: "success", text: "Rota agendada." });
+        toast.success("Rota agendada.");
         fetchData();
       } else {
-        setToast({
-          type: "error",
-          text: (res.body as { message?: string })?.message ?? "Erro ao agendar.",
-        });
+        toast.error((res.body as { message?: string })?.message ?? "Erro ao agendar.");
       }
     },
     [effectiveCompanyId, isSuperAdmin, PostAPI, fetchData]
@@ -490,13 +487,10 @@ export function PlanningRoutesCalendar() {
         : `/route/schedule/${scheduleId}`;
       const res = await DeleteAPI(url, true);
       if (res.status === 200 || (res as { status?: number }).status === 204) {
-        setToast({ type: "success", text: "Agendamento removido." });
+        toast.success("Agendamento removido.");
         fetchData();
       } else {
-        setToast({
-          type: "error",
-          text: (res.body as { message?: string })?.message ?? "Erro ao remover.",
-        });
+        toast.error((res.body as { message?: string })?.message ?? "Erro ao remover.");
       }
     },
     [effectiveCompanyId, isSuperAdmin, DeleteAPI, fetchData]
@@ -514,10 +508,7 @@ export function PlanningRoutesCalendar() {
       const delRes = await DeleteAPI(deleteUrl, true);
       if (delRes.status !== 200 && (delRes as { status?: number }).status !== 204) {
         setMovingScheduleId(null);
-        setToast({
-          type: "error",
-          text: (delRes.body as { message?: string })?.message ?? "Erro ao mover agendamento.",
-        });
+        toast.error((delRes.body as { message?: string })?.message ?? "Erro ao mover agendamento.");
         return;
       }
       const body: { routeId: string; scheduledStartAt: string; companyId?: string } = {
@@ -528,13 +519,10 @@ export function PlanningRoutesCalendar() {
       const createRes = await PostAPI("/route/schedule", body, true);
       setMovingScheduleId(null);
       if (createRes.status === 200 || createRes.status === 201) {
-        setToast({ type: "success", text: "Agendamento movido." });
+        toast.success("Agendamento movido.");
         fetchData();
       } else {
-        setToast({
-          type: "error",
-          text: (createRes.body as { message?: string })?.message ?? "Erro ao mover agendamento.",
-        });
+        toast.error((createRes.body as { message?: string })?.message ?? "Erro ao mover agendamento.");
       }
     },
     [effectiveCompanyId, isSuperAdmin, DeleteAPI, PostAPI, fetchData]
@@ -598,22 +586,6 @@ export function PlanningRoutesCalendar() {
 
   return (
     <div className="space-y-4">
-      {toast && (
-        <div
-          className={cn(
-            "rounded-lg border p-4 text-sm",
-            toast.type === "success"
-              ? "border-green-200 bg-green-50 text-green-800"
-              : "border-red-200 bg-red-50 text-red-800"
-          )}
-        >
-          {toast.text}
-          <button type="button" className="ml-2 underline" onClick={() => setToast(null)}>
-            Fechar
-          </button>
-        </div>
-      )}
-
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-4">
           <button

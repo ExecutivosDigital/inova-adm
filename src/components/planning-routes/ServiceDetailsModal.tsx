@@ -2,15 +2,15 @@
 
 import type { CipService } from "@/lib/route-types";
 import {
-    Calendar,
-    Clock,
-    Layers,
-    Package,
-    Settings,
-    Tag,
-    Users,
-    Wrench,
-    X,
+  Calendar,
+  Clock,
+  Layers,
+  Package,
+  Settings,
+  Tag,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react";
 
 interface ServiceDetailsModalProps {
@@ -218,7 +218,7 @@ export function ServiceDetailsModal({
                     <>
                       <DetailRow
                         icon={Wrench}
-                        label="Modelo de serviço"
+                        label="serviço"
                         value={service.serviceModel?.name}
                       />
                       {service.serviceModel?.description && (

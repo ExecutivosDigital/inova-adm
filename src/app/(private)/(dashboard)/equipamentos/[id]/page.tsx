@@ -13,6 +13,7 @@ import type {
 } from "@/lib/equipment-types";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
 export default function EquipmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -41,6 +42,7 @@ export default function EquipmentDetailPage() {
           ? res.body.message
           : "Equipamento não encontrado.";
       setError(msg);
+      toast.error(msg);
     }
     setLoading(false);
   }, [id, GetAPI]);

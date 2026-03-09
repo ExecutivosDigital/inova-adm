@@ -17,8 +17,8 @@ import {
 } from "@/components/ui/select";
 import { useCompany } from "@/context/CompanyContext";
 import { Building2, Loader2 } from "lucide-react";
-import React from "react";
 import { usePathname } from "next/navigation";
+import React from "react";
 
 function generateBreadcrumbs(pathname: string) {
   const paths = pathname.split("/").filter((x) => x);
@@ -43,7 +43,7 @@ export function TopBar() {
   } = useCompany();
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
+    <header className="absolute top-0 left-0 flex h-16 w-full bg-white items-center justify-between border-b border-slate-200 px-6">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-4">
         <Breadcrumb>

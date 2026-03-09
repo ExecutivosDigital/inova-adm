@@ -1,9 +1,11 @@
 "use client";
 
 import type { CipService, Route } from "@/lib/route-types";
-import { getPeriodDifferenceWarning } from "@/components/planning-routes/periodWarning";
+import { getRoutePeriodMismatchWarning } from "@/components/planning-routes/periodWarning";
+import { useFilterCatalogs } from "@/hooks/useFilterCatalogs";
 import { Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 
 interface RouteFormModalProps {
   open: boolean;
@@ -36,20 +38,24 @@ export function RouteFormModal({
 }: RouteFormModalProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<string>("pending");
-  const [finishedAt, setFinishedAt] = useState("");
+  const [routePeriodId, setRoutePeriodId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const { catalogs } = useFilterCatalogs();
 
   const isEditMode = !!route;
 
   const periodWarning = useMemo(() => {
-    if (isEditMode || !initialSelectedServiceIds?.length || !initialCipServices?.length) {
+    if (!routePeriodId || !initialSelectedServiceIds?.length || !initialCipServices?.length) {
       return { shouldWarn: false as const };
     }
-    return getPeriodDifferenceWarning(initialCipServices, initialSelectedServiceIds);
-  }, [isEditMode, initialSelectedServiceIds, initialCipServices]);
+    return getRoutePeriodMismatchWarning(
+      routePeriodId,
+      initialCipServices,
+      initialSelectedServiceIds
+    );
+  }, [routePeriodId, initialSelectedServiceIds, initialCipServices]);
 
   useEffect(() => {
     if (open && nameInputRef.current) {
@@ -63,13 +69,11 @@ export function RouteFormModal({
     if (route) {
       setName(route.name);
       setDescription(route.description ?? "");
-      setStatus(route.status);
-      setFinishedAt(route.finishedAt ?? "");
+      setRoutePeriodId(route.routePeriodId ?? "");
     } else {
       setName("");
       setDescription("");
-      setStatus("pending");
-      setFinishedAt("");
+      setRoutePeriodId("");
     }
   }, [open, route]);
 
@@ -87,20 +91,27 @@ export function RouteFormModal({
           const res = await putApi(`/route/single/${route.id}`, {
             name: name.trim(),
             description: description.trim() || undefined,
-            status,
-            finishedAt: finishedAt || undefined,
+            routePeriodId: routePeriodId || undefined,
           }, true);
           if (res.status === 200) {
             onSuccess();
             onClose();
+            toast.success("Rota atualizada com sucesso.");
           } else {
-            setError((res.body as { message?: string })?.message ?? "Erro ao salvar.");
+            const msg = (res.body as { message?: string })?.message ?? "Erro ao salvar.";
+            setError(msg);
+            toast.error(msg);
           }
         } else {
-          const body: { name: string; description?: string; status: string; companyId?: string } = {
+          if (!routePeriodId?.trim()) {
+            setError("Selecione o período da rota.");
+            setLoading(false);
+            return;
+          }
+          const body: { name: string; description?: string; routePeriodId: string; companyId?: string } = {
             name: name.trim(),
             description: description.trim() || undefined,
-            status: "pending",
+            routePeriodId: routePeriodId.trim(),
           };
           if (isSuperAdmin) body.companyId = createRoutePayload.companyId;
           const res = await postApi("/route/single", body, true);
@@ -108,15 +119,21 @@ export function RouteFormModal({
             const created = res.body as { route?: { id: string } };
             const routeId = created?.route?.id;
             if (routeId && initialSelectedServiceIds?.length) {
-              await postApi(`/route/single/${routeId}/services`, {
+              const addRes = await postApi(`/route/single/${routeId}/services`, {
                 cipServiceIds: initialSelectedServiceIds,
               }, true);
+              if (addRes.status !== 200 && addRes.status !== 201) {
+                toast.error((addRes.body as { message?: string })?.message ?? "Erro ao vincular serviços.");
+              }
               await fetchRouteCipServices();
             }
             onSuccess();
             onClose();
+            toast.success("Rota criada com sucesso.");
           } else {
-            setError((res.body as { message?: string })?.message ?? "Erro ao criar rota.");
+            const msg = (res.body as { message?: string })?.message ?? "Erro ao criar rota.";
+            setError(msg);
+            toast.error(msg);
           }
         }
       } finally {
@@ -126,8 +143,7 @@ export function RouteFormModal({
     [
       name,
       description,
-      status,
-      finishedAt,
+      routePeriodId,
       isEditMode,
       route,
       isSuperAdmin,
@@ -191,36 +207,27 @@ export function RouteFormModal({
             />
           </div>
 
-          {isEditMode && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-              >
-                <option value="pending">Pendente</option>
-                <option value="in_progress">Em andamento</option>
-                <option value="completed">Concluída</option>
-                <option value="cancelled">Cancelada</option>
-                <option value="archived">Arquivada</option>
-              </select>
-            </div>
-          )}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Período da rota {!isEditMode && "*"}
+            </label>
+            <select
+              value={routePeriodId}
+              onChange={(e) => setRoutePeriodId(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
+              required={!isEditMode}
+            >
+              <option value="">Selecione o período</option>
+              {catalogs.periods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.days != null ? ` (${p.days} dia${p.days !== 1 ? "s" : ""})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          {isEditMode && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Data de finalização</label>
-              <input
-                type="datetime-local"
-                value={finishedAt}
-                onChange={(e) => setFinishedAt(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
-              />
-            </div>
-          )}
-
-          {!isEditMode && initialSelectedServiceIds?.length ? (
+          {!isEditMode && initialSelectedServiceIds?.length && routePeriodId ? (
             <>
               {periodWarning.shouldWarn && periodWarning.message ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -243,7 +250,7 @@ export function RouteFormModal({
             </button>
             <button
               type="submit"
-              disabled={loading || !name.trim()}
+              disabled={loading || !name.trim() || (!isEditMode && !routePeriodId?.trim())}
               className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}

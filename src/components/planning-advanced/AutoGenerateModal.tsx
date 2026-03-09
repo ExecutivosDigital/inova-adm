@@ -1,12 +1,21 @@
 "use client";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { AutoGenerateOptions } from "@/lib/planning-advanced-types";
 import { Calendar, Loader2, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+
+/** Agendamento com pelo menos data de início (para contagem no período) */
+interface ScheduleWithDate {
+  scheduledStartAt: string;
+  type?: "route" | "service";
+}
 
 interface AutoGenerateModalProps {
   open: boolean;
   onClose: () => void;
+  /** Agendamentos já existentes (para mostrar quantos serão ignorados no período) */
+  existingSchedules?: ScheduleWithDate[];
   onGenerate: (options: AutoGenerateOptions) => void;
   loading?: boolean;
 }
@@ -14,6 +23,7 @@ interface AutoGenerateModalProps {
 export function AutoGenerateModal({
   open,
   onClose,
+  existingSchedules = [],
   onGenerate,
   loading = false,
 }: AutoGenerateModalProps) {
@@ -21,30 +31,61 @@ export function AutoGenerateModal({
     const today = new Date();
     return today.toISOString().split("T")[0];
   });
-  
+
   const [endDate, setEndDate] = useState(() => {
     const today = new Date();
     const oneYearLater = new Date(today);
     oneYearLater.setFullYear(today.getFullYear() + 1);
     return oneYearLater.toISOString().split("T")[0];
   });
-  
+  const [validationAlert, setValidationAlert] = useState<{ open: boolean; message: string }>({
+    open: false,
+    message: "",
+  });
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
+  const [pendingOptions, setPendingOptions] = useState<AutoGenerateOptions | null>(null);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (new Date(startDate) > new Date(endDate)) {
-      alert("A data de início deve ser anterior à data de fim.");
+      setValidationAlert({
+        open: true,
+        message: "A data de início deve ser anterior à data de fim.",
+      });
       return;
     }
-    
-    onGenerate({
-      startDate,
-      endDate,
-    });
+
+    setPendingOptions({ startDate, endDate });
+    setShowGenerateConfirm(true);
   };
-  
+
+  const handleConfirmGenerate = () => {
+    if (pendingOptions) {
+      onGenerate(pendingOptions);
+      setPendingOptions(null);
+    }
+    setShowGenerateConfirm(false);
+  };
+
+  const summary = useMemo(() => {
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate + "T23:59:59.999Z").getTime();
+    const inPeriod = existingSchedules.filter((s) => {
+      const t = new Date(s.scheduledStartAt).getTime();
+      return t >= start && t <= end;
+    });
+    const routeCount = inPeriod.filter((s) => s.type === "route").length;
+    const serviceCount = inPeriod.filter((s) => s.type === "service").length;
+    return {
+      existingInPeriodCount: inPeriod.length,
+      routeCount,
+      serviceCount,
+    };
+  }, [existingSchedules, startDate, endDate]);
+
   if (!open) return null;
-  
+
   const daysDiff = Math.ceil(
     (new Date(endDate).getTime() - new Date(startDate).getTime()) /
       (1000 * 60 * 60 * 24)
@@ -104,7 +145,26 @@ export function AutoGenerateModal({
                   O sistema gerará agendamentos para todos os serviços com
                   periodicidade configurada neste período.
                 </p>
+                <p className="mt-1.5 text-blue-700">
+                  Rotas e serviços que já possuem agendamento no período serão ignorados.
+                </p>
               </div>
+            )}
+          </div>
+
+          {/* Resumo do período (estilo igual à modal de OS em lote) */}
+          <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+            <p className="font-medium text-slate-700">Resumo do período</p>
+            <p className="mt-1">
+              O sistema gerará novos agendamentos conforme a periodicidade. Agendamentos já existentes no período serão ignorados.
+            </p>
+            {summary.existingInPeriodCount > 0 && (
+              <p className="mt-1.5 text-amber-700">
+                <span className="font-medium">{summary.existingInPeriodCount}</span> agendamento(s) já existem no período selecionado e serão ignorados
+                {summary.routeCount > 0 || summary.serviceCount > 0 ? (
+                  <span> ({summary.routeCount} rota(s), {summary.serviceCount} serviço(s))</span>
+                ) : null}.
+              </p>
             )}
           </div>
           
@@ -156,6 +216,29 @@ export function AutoGenerateModal({
           </div>
         </form>
       </div>
+
+      <ConfirmDialog
+        open={validationAlert.open}
+        onOpenChange={(open) => !open && setValidationAlert((prev) => ({ ...prev, open: false }))}
+        title="Data inválida"
+        description={validationAlert.message}
+        onConfirm={() => setValidationAlert((prev) => ({ ...prev, open: false }))}
+        alertMode
+      />
+
+      <ConfirmDialog
+        open={showGenerateConfirm}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowGenerateConfirm(false);
+            setPendingOptions(null);
+          }
+        }}
+        title="Gerar planejamento automático"
+        description="Tem certeza que deseja gerar o planejamento automático? Rotas e serviços que já possuem agendamento no período serão ignorados."
+        confirmLabel="Gerar"
+        onConfirm={handleConfirmGenerate}
+      />
     </div>
   );
 }

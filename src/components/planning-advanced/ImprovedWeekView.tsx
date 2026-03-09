@@ -14,7 +14,7 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { CalendarPlus, CheckCircle2, Eye, FileText, Plus, Trash2, Route as RouteIcon, Wrench } from "lucide-react";
+import { CalendarPlus, CheckCircle2, Eye, FileText, Plus, Trash2, Route as RouteIcon, Users, Wrench } from "lucide-react";
 import { format, isSameDay, startOfDay, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import React, { useCallback, useMemo, useState } from "react";
@@ -25,6 +25,10 @@ import type {
   PlanningService,
 } from "@/lib/planning-advanced-types";
 import type { WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
+import {
+  getSummaryVariantForWorkOrders,
+  WORK_ORDER_VARIANT_CLASSES,
+} from "@/lib/work-order-status";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const BRAZIL_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -38,6 +42,7 @@ interface ImprovedWeekViewProps {
   onAddSchedule: (type: "route" | "service", dateKey: string, slotMin: number) => void;
   onRemoveSchedule: (scheduleId: string) => void;
   onMoveSchedule: (scheduleId: string, dateKey: string, slotMin: number) => void;
+  onAssignWorkers?: (schedule: ScheduleItem) => void;
   readOnly?: boolean;
   onProgramar?: (schedule: ScheduleItem) => void;
   workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[];
@@ -85,6 +90,7 @@ export function ImprovedWeekView({
   onAddSchedule,
   onRemoveSchedule,
   onMoveSchedule,
+  onAssignWorkers,
   readOnly = false,
   onProgramar,
   workOrdersForSchedule,
@@ -174,6 +180,7 @@ export function ImprovedWeekView({
             onAddSchedule={onAddSchedule}
             onRemoveSchedule={onRemoveSchedule}
             onMoveSchedule={onMoveSchedule}
+            onAssignWorkers={onAssignWorkers}
             movingScheduleId={movingScheduleId}
             readOnly={readOnly}
             onProgramar={onProgramar}
@@ -213,6 +220,7 @@ function DayColumn({
   onAddSchedule,
   onRemoveSchedule,
   onMoveSchedule,
+  onAssignWorkers,
   movingScheduleId,
   readOnly = false,
   onProgramar,
@@ -226,6 +234,7 @@ function DayColumn({
   onAddSchedule: (type: "route" | "service", dateKey: string, slotMin: number) => void;
   onRemoveSchedule: (scheduleId: string) => void;
   onMoveSchedule: (scheduleId: string, dateKey: string, slotMin: number) => void;
+  onAssignWorkers?: (schedule: ScheduleItem) => void;
   movingScheduleId: string | null;
   readOnly?: boolean;
   onProgramar?: (schedule: ScheduleItem) => void;
@@ -347,6 +356,7 @@ function DayColumn({
                     displayName={displayName}
                     isRoute={isRoute}
                     onRemove={() => onRemoveSchedule(schedule.id)}
+                    onAssignWorkers={onAssignWorkers ? () => onAssignWorkers(schedule) : undefined}
                   />
                 );
               })
@@ -397,7 +407,7 @@ function ReadOnlyScheduleCard({
     <div
       className={cn(
         "rounded-lg border p-2.5 transition-all",
-        isRoute ? "border-primary/40 bg-primary/10" : "border-green-500/40 bg-green-50"
+        "border-primary/40 bg-primary/10"
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -405,14 +415,27 @@ function ReadOnlyScheduleCard({
           {isRoute ? (
             <RouteIcon className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
           ) : (
-            <Wrench className="h-3.5 w-3.5 shrink-0 text-green-600 mt-0.5" />
+            <Wrench className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
           )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-slate-900 truncate">{displayName}</p>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span>{timeStr}</span>
               <span>•</span>
               <span>{formatDuration(schedule.duration)}</span>
+              {workOrders.length > 0 && (() => {
+                const variant = getSummaryVariantForWorkOrders(workOrders) ?? "warning";
+                const classes = WORK_ORDER_VARIANT_CLASSES[variant];
+                return (
+                  <span
+                    className={cn("inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium", classes.bg, classes.text, classes.border)}
+                    title="Ordem(ns) de serviço"
+                  >
+                    <CheckCircle2 className="h-2.5 w-2.5" />
+                    Emitida
+                  </span>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -427,7 +450,7 @@ function ReadOnlyScheduleCard({
               <FileText className="h-3.5 w-3.5" />
             </button>
           )}
-          {onProgramar && (
+          {onProgramar && workOrders.length === 0 && (
             <button
               type="button"
               onClick={() => onProgramar(schedule)}
@@ -452,6 +475,7 @@ function DraggableScheduleCard({
   displayName,
   isRoute,
   onRemove,
+  onAssignWorkers,
 }: {
   id: string;
   data: ScheduleDragData;
@@ -461,6 +485,7 @@ function DraggableScheduleCard({
   displayName: string;
   isRoute: boolean;
   onRemove: () => void;
+  onAssignWorkers?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,
@@ -476,7 +501,7 @@ function DraggableScheduleCard({
         "group cursor-grab rounded-lg border p-2.5 transition-all hover:shadow-md active:cursor-grabbing",
         isRoute
           ? "border-primary/40 bg-primary/10"
-          : "border-green-500/40 bg-green-50",
+          : "border-primary/40 bg-primary/10",
         isDragging && "opacity-50 z-10",
         isMoving && "opacity-60"
       )}
@@ -488,7 +513,7 @@ function DraggableScheduleCard({
           {isRoute ? (
             <RouteIcon className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
           ) : (
-            <Wrench className="h-3.5 w-3.5 shrink-0 text-green-600 mt-0.5" />
+            <Wrench className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
           )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-slate-900 truncate">
@@ -498,21 +523,42 @@ function DraggableScheduleCard({
               <span>{timeStr}</span>
               <span>•</span>
               <span>{formatDuration(schedule.duration)}</span>
+              {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
+                <span className="text-primary" title="Workers atribuídos">
+                  · {schedule.assignedWorkerIds!.length} worker(s)
+                </span>
+              )}
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onRemove();
-          }}
-          className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-600 group-hover:opacity-100"
-          title="Remover"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {onAssignWorkers && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAssignWorkers();
+              }}
+              className="rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-primary group-hover:opacity-100"
+              title="Atribuir workers"
+            >
+              <Users className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-600 group-hover:opacity-100"
+            title="Remover"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
     </div>
   );

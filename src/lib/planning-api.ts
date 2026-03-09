@@ -1,9 +1,9 @@
 import { useApiContext } from '@/context/ApiContext';
 import type {
-  PlanningScheduleItem,
-  RouteScheduleItem,
-  ServiceScheduleItem,
-  WorkloadIndicator,
+    PlanningScheduleItem,
+    RouteScheduleItem,
+    ServiceScheduleItem,
+    WorkloadIndicator,
 } from './route-types';
 
 interface CreateServiceScheduleData {
@@ -38,7 +38,7 @@ export async function fetchSchedules(
       serviceSchedules: (res.body.serviceSchedules || []) as ServiceScheduleItem[],
     };
   }
-  throw new Error('Erro ao buscar agendamentos');
+  throw new Error((res.body as { message?: string })?.message ?? 'Erro ao buscar agendamentos');
 }
 
 /**
@@ -49,11 +49,10 @@ export async function createServiceSchedule(
   apiContext: ReturnType<typeof useApiContext>
 ): Promise<{ serviceSchedule: ServiceScheduleItem }> {
   const res = await apiContext.PostAPI('/planning/service-schedule', data, true);
-  console.log("createServiceSchedule res", res);
   if (res.status === 200 && res.body?.serviceSchedule) {
     return { serviceSchedule: res.body.serviceSchedule as ServiceScheduleItem };
   }
-  throw new Error('Erro ao criar agendamento de serviço');
+  throw new Error((res.body as { message?: string })?.message ?? 'Erro ao criar agendamento de serviço');
 }
 
 /**
@@ -73,7 +72,7 @@ export async function updateServiceSchedule(
   if (res.status === 200 && res.body?.serviceSchedule) {
     return { serviceSchedule: res.body.serviceSchedule as ServiceScheduleItem };
   }
-  throw new Error('Erro ao atualizar agendamento de serviço');
+  throw new Error((res.body as { message?: string })?.message ?? 'Erro ao atualizar agendamento de serviço');
 }
 
 /**
@@ -89,7 +88,7 @@ export async function deleteServiceSchedule(
     true
   );
   if (res.status !== 200) {
-    throw new Error('Erro ao remover agendamento de serviço');
+    throw new Error((res.body as { message?: string })?.message ?? 'Erro ao remover agendamento de serviço');
   }
 }
 
@@ -99,12 +98,12 @@ export async function deleteServiceSchedule(
 export async function autoGeneratePlanning(
   options: AutoGeneratePlanningOptions,
   apiContext: ReturnType<typeof useApiContext>
-): Promise<{ created: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> }> {
+): Promise<{ created: number; skipped?: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> }> {
   const res = await apiContext.PostAPI('/planning/auto-generate', options, true);
   if (res.status === 200 && res.body) {
-    return res.body as { created: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> };
+    return res.body as { created: number; skipped?: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> };
   }
-  throw new Error('Erro ao gerar planejamento automático');
+  throw new Error((res.body as { message?: string })?.message ?? 'Erro ao gerar planejamento automático');
 }
 
 /**
@@ -120,7 +119,7 @@ export async function fetchWorkload(
   if (res.status === 200 && res.body?.indicators) {
     return { indicators: res.body.indicators as WorkloadIndicator[] };
   }
-  throw new Error('Erro ao buscar indicadores de carga');
+  throw new Error((res.body as { message?: string })?.message ?? 'Erro ao buscar indicadores de carga');
 }
 
 /**

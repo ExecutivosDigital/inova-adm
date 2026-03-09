@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Lock, Search } from "lucide-react";
 import * as React from "react";
 
 export interface MultiSelectDropdownItem {
@@ -33,6 +33,14 @@ interface MultiSelectDropdownProps {
   contentWidth?: string;
   /** Altura máxima da lista (ex.: "12rem") */
   listMaxHeight?: string;
+  /** Se true, exibe botões "Selecionar todos" e "Remover todos" no rodapé */
+  showSelectAllDeselectAll?: boolean;
+  /** Callback ao clicar em "Selecionar todos" */
+  onSelectAll?: () => void;
+  /** Callback ao clicar em "Remover todos" */
+  onDeselectAll?: () => void;
+  /** IDs que não podem ser desmarcados (ex.: colunas fixas); exibe ícone de cadeado e desabilita o checkbox */
+  fixedIds?: string[];
 }
 
 export function MultiSelectDropdown({
@@ -44,6 +52,10 @@ export function MultiSelectDropdown({
   className,
   contentWidth,
   listMaxHeight = "12rem",
+  showSelectAllDeselectAll = false,
+  onSelectAll,
+  onDeselectAll,
+  fixedIds = [],
 }: MultiSelectDropdownProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
@@ -93,6 +105,12 @@ export function MultiSelectDropdown({
               autoComplete="off"
             />
           </div>
+          {fixedIds.length > 0 && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+              <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Campos com cadeado não podem ser removidos.
+            </p>
+          )}
         </div>
         <div
           className="border-t border-slate-100"
@@ -112,26 +130,34 @@ export function MultiSelectDropdown({
               >
                 {filteredItems.map((item) => {
                   const isSelected = selectedIds.includes(item.id);
+                  const isFixed = fixedIds.includes(item.id);
                   return (
                     <li key={item.id} role="option" aria-selected={isSelected}>
                       <label
                         className={cn(
                           "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-50",
                           isSelected && "bg-primary/5 text-primary",
+                          isFixed && "cursor-default",
                         )}
+                        title={isFixed ? "Campo fixo – não pode ser removido" : undefined}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={(e) =>
-                            onToggle(item.id, e.target.checked)
-                          }
-                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                          disabled={isFixed}
+                          onChange={(e) => !isFixed && onToggle(item.id, e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-70"
                           onClick={(e) => e.stopPropagation()}
                         />
                         <span className="truncate text-slate-700">
                           {item.name}
                         </span>
+                        {isFixed && (
+                          <Lock
+                            className="h-3.5 w-3.5 shrink-0 text-slate-400"
+                            aria-hidden
+                          />
+                        )}
                       </label>
                     </li>
                   );
@@ -141,6 +167,28 @@ export function MultiSelectDropdown({
             </div>
           </ScrollArea>
         </div>
+        {showSelectAllDeselectAll && (onSelectAll != null || onDeselectAll != null) && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 p-2">
+            {onSelectAll != null && (
+              <button
+                type="button"
+                onClick={() => { onSelectAll(); }}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Selecionar todos
+              </button>
+            )}
+            {onDeselectAll != null && (
+              <button
+                type="button"
+                onClick={() => { onDeselectAll(); }}
+                className="text-sm font-medium text-slate-600 hover:underline"
+              >
+                Remover todos
+              </button>
+            )}
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

@@ -23,6 +23,7 @@ import type {
 import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { CalendarClock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 function buildWorkOrdersForSchedule(
   schedule: ScheduleItem,
@@ -200,13 +201,20 @@ export function ProgramacaoCalendarContainer() {
     return counts;
   }, [schedules, currentDate]);
 
+  // Meses sem planejamento (0 rotas e 0 serviços) ficam null → azul na visão anual.
   const monthlySummariesForYear = useMemo(() => {
     if (!yearWorkloadSummaries || yearWorkloadSummaries.length !== 12) return null;
-    return yearWorkloadSummaries.map((w, i) => ({
-      ...w,
-      routeCount: scheduleCountsByMonth[i].routeCount,
-      serviceCount: scheduleCountsByMonth[i].serviceCount,
-    }));
+    return yearWorkloadSummaries.map((w, i) => {
+      const routeCount = scheduleCountsByMonth[i].routeCount;
+      const serviceCount = scheduleCountsByMonth[i].serviceCount;
+      const hasNoPlanning = routeCount === 0 && serviceCount === 0;
+      if (hasNoPlanning) return null;
+      return {
+        ...w,
+        routeCount,
+        serviceCount,
+      };
+    });
   }, [yearWorkloadSummaries, scheduleCountsByMonth]);
 
   const handleNavigate = useCallback((action: "prev" | "next" | "today") => {
@@ -268,6 +276,11 @@ export function ProgramacaoCalendarContainer() {
 
   const scheduleItems = useMemo(() => {
     return schedules.map((schedule) => {
+      const raw = schedule as { assignedWorkerIds?: string[]; assignedWorkers?: Array<{ id: string; name: string }> };
+      const base = {
+        assignedWorkerIds: raw.assignedWorkerIds ?? [],
+        assignedWorkers: raw.assignedWorkers ?? [],
+      };
       if (schedule.type === "route") {
         const route = routes.find((r) => r.id === schedule.routeId);
         const duration = schedule.durationMinutes ?? 120;
@@ -277,6 +290,7 @@ export function ProgramacaoCalendarContainer() {
           routeId: schedule.routeId,
           scheduledStartAt: schedule.scheduledStartAt,
           duration,
+          ...base,
           route: route
             ? { id: route.id, code: route.code, name: route.name, duration }
             : undefined,
@@ -289,6 +303,7 @@ export function ProgramacaoCalendarContainer() {
           serviceId: schedule.cipServiceId,
           scheduledStartAt: schedule.scheduledStartAt,
           duration: schedule.cipService?.executionTime?.minutes || 60,
+          ...base,
           service: service
             ? {
                 id: service.id,
@@ -314,78 +329,53 @@ export function ProgramacaoCalendarContainer() {
     async (schedule: ScheduleItem) => {
       const workOrders = buildWorkOrdersForSchedule(schedule, routeCipServices);
       if (workOrders.length === 0) {
-        alert("Nenhuma ordem de serviço a emitir para este item.");
+        toast.error("Nenhuma ordem de serviço a emitir para este item.");
         return;
       }
+      const visibilityMode = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role";
+      const workerIds = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? schedule.assignedWorkerIds : undefined;
       setEmitting(true);
       try {
+        const payloadSingle = {
+          cipServiceId: workOrders[0].cipServiceId,
+          routeId: workOrders[0].routeId ?? undefined,
+          scheduledAt: workOrders[0].scheduledAt,
+          visibilityMode,
+          ...(workerIds?.length ? { workerIds } : {}),
+        };
         if (workOrders.length === 1) {
-          await apiContext.PostAPI(
-            "/work-order/single",
-            {
-              cipServiceId: workOrders[0].cipServiceId,
-              routeId: workOrders[0].routeId ?? undefined,
-              scheduledAt: workOrders[0].scheduledAt,
-            },
-            true
-          );
+          const res = await apiContext.PostAPI("/work-order/single", payloadSingle, true);
+          if (res.status !== 200 && res.status !== 201) {
+            toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordem de serviço.");
+            return;
+          }
         } else {
-          await apiContext.PostAPI(
-            "/work-order/multi",
-            {
-              workOrders: workOrders.map((wo) => ({
-                cipServiceId: wo.cipServiceId,
-                routeId: wo.routeId ?? undefined,
-                scheduledAt: wo.scheduledAt,
-              })),
-            },
-            true
-          );
+          const payloadMulti = {
+            workOrders: workOrders.map((wo) => ({
+              cipServiceId: wo.cipServiceId,
+              routeId: wo.routeId ?? undefined,
+              scheduledAt: wo.scheduledAt,
+              visibilityMode,
+              ...(workerIds?.length ? { workerIds } : {}),
+            })),
+          };
+          const res = await apiContext.PostAPI("/work-order/multi", payloadMulti, true);
+          if (res.status !== 200 && res.status !== 201) {
+            toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordens de serviço.");
+            return;
+          }
         }
         setScheduleToConfirm(null);
-        alert(`${workOrders.length} ordem(ns) de serviço emitida(s).`);
+        toast.success(`${workOrders.length} ordem(ns) de serviço emitida(s).`);
         fetchData();
       } catch (error) {
         console.error("Erro ao emitir work order:", error);
-        alert("Erro ao emitir ordem de serviço. Tente novamente.");
+        toast.error("Erro ao emitir ordem de serviço. Tente novamente.");
       } finally {
         setEmitting(false);
       }
     },
     [routeCipServices, apiContext, fetchData]
-  );
-
-  const handleBulkConfirm = useCallback(
-    async (startDate: string, endDate: string) => {
-      const workOrders = buildWorkOrdersForPeriod(scheduleItems, routeCipServices, startDate, endDate);
-      if (workOrders.length === 0) {
-        alert("Nenhum agendamento no período selecionado.");
-        return;
-      }
-      setEmitting(true);
-      try {
-        await apiContext.PostAPI(
-          "/work-order/multi",
-          {
-            workOrders: workOrders.map((wo) => ({
-              cipServiceId: wo.cipServiceId,
-              routeId: wo.routeId ?? undefined,
-              scheduledAt: wo.scheduledAt,
-            })),
-          },
-          true
-        );
-        setShowBulkModal(false);
-        alert(`${workOrders.length} ordem(ns) de serviço emitida(s).`);
-        fetchData();
-      } catch (error) {
-        console.error("Erro ao emitir work orders em lote:", error);
-        alert("Erro ao emitir ordens de serviço. Tente novamente.");
-      } finally {
-        setEmitting(false);
-      }
-    },
-    [scheduleItems, routeCipServices, apiContext, fetchData]
   );
 
   const noop = useCallback(() => {}, []);
@@ -414,6 +404,74 @@ export function ProgramacaoCalendarContainer() {
     }
     return map;
   }, [scheduleItems, workOrders]);
+
+  /** IDs de agendamentos que já possuem todas as OS emitidas (serão excluídos do lote) */
+  const scheduleIdsWithOS = useMemo(() => {
+    const set = new Set<string>();
+    for (const schedule of scheduleItems) {
+      const matched = workOrdersByScheduleId.get(schedule.id) ?? [];
+      const expectedCount = buildWorkOrdersForSchedule(schedule, routeCipServices).length;
+      if (expectedCount > 0 && matched.length >= expectedCount) set.add(schedule.id);
+    }
+    return set;
+  }, [scheduleItems, routeCipServices, workOrdersByScheduleId]);
+
+  const getWOCountForSchedule = useCallback(
+    (schedule: ScheduleItem) => buildWorkOrdersForSchedule(schedule, routeCipServices).length,
+    [routeCipServices]
+  );
+
+  const handleBulkConfirm = useCallback(
+    async (startDate: string, endDate: string) => {
+      const start = new Date(startDate).getTime();
+      const end = new Date(endDate + "T23:59:59.999Z").getTime();
+      const workOrdersPayload: Array<{
+        cipServiceId: string;
+        routeId?: string | null;
+        scheduledAt: string;
+        visibilityMode: "all_with_team_role" | "assigned_workers";
+        workerIds?: string[];
+      }> = [];
+      for (const schedule of scheduleItems) {
+        const t = new Date(schedule.scheduledStartAt).getTime();
+        if (t < start || t > end) continue;
+        if (scheduleIdsWithOS.has(schedule.id)) continue;
+        const wos = buildWorkOrdersForSchedule(schedule, routeCipServices);
+        const visibilityMode = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role";
+        const workerIds = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? schedule.assignedWorkerIds : undefined;
+        for (const wo of wos) {
+          workOrdersPayload.push({
+            cipServiceId: wo.cipServiceId,
+            routeId: wo.routeId ?? undefined,
+            scheduledAt: wo.scheduledAt,
+            visibilityMode,
+            ...(workerIds?.length ? { workerIds } : {}),
+          });
+        }
+      }
+      if (workOrdersPayload.length === 0) {
+        toast.error("Nenhum agendamento pendente no período selecionado (todos já possuem ordem de serviço ou período vazio).");
+        return;
+      }
+      setEmitting(true);
+      try {
+        const res = await apiContext.PostAPI("/work-order/multi", { workOrders: workOrdersPayload }, true);
+        if (res.status !== 200 && res.status !== 201) {
+          toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordens de serviço.");
+          return;
+        }
+        setShowBulkModal(false);
+        toast.success(`${workOrdersPayload.length} ordem(ns) de serviço emitida(s).`);
+        fetchData();
+      } catch (error) {
+        console.error("Erro ao emitir work orders em lote:", error);
+        toast.error("Erro ao emitir ordens de serviço. Tente novamente.");
+      } finally {
+        setEmitting(false);
+      }
+    },
+    [scheduleItems, routeCipServices, scheduleIdsWithOS, apiContext, fetchData]
+  );
 
   const workOrdersForSchedule = useCallback(
     (schedule: ScheduleItem) => workOrdersByScheduleId.get(schedule.id) ?? [],
@@ -514,6 +572,8 @@ export function ProgramacaoCalendarContainer() {
           <AdvancedMonthlyCalendar
             displayDate={currentDate}
             indicators={workloadIndicators}
+            schedules={scheduleItems}
+            companySchedule={companyScheduleFormatted}
             onDateClick={(dateKey) => {
               const [y, m, d] = dateKey.split("-").map(Number);
               const date = new Date(y, m - 1, d);
@@ -529,7 +589,7 @@ export function ProgramacaoCalendarContainer() {
         open={scheduleToConfirm != null}
         onClose={() => setScheduleToConfirm(null)}
         schedule={scheduleToConfirm}
-        onConfirm={scheduleToConfirm ? () => handleConfirmProgramar(scheduleToConfirm) : () => {}}
+        onConfirm={() => (scheduleToConfirm ? handleConfirmProgramar(scheduleToConfirm) : undefined)}
         loading={emitting}
       />
 
@@ -537,6 +597,8 @@ export function ProgramacaoCalendarContainer() {
         open={showBulkModal}
         onClose={() => setShowBulkModal(false)}
         schedules={scheduleItems}
+        scheduleIdsWithOS={scheduleIdsWithOS}
+        getWOCountForSchedule={getWOCountForSchedule}
         onConfirm={handleBulkConfirm}
         loading={emitting}
       />

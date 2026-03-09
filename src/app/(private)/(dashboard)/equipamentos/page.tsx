@@ -7,6 +7,7 @@ import { useCompany } from "@/context/CompanyContext";
 import type { EquipmentFromApi, EquipmentListResponse } from "@/lib/equipment-types";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 
 export default function EquipamentosPage() {
   const { GetAPI } = useApiContext();
@@ -36,6 +37,7 @@ export default function EquipamentosPage() {
           : "Falha ao carregar equipamentos.";
       setError(msg);
       setEquipments([]);
+      toast.error(msg);
     }
     setLoading(false);
   }, [GetAPI, isSuperAdmin, selectedCompanyId]);

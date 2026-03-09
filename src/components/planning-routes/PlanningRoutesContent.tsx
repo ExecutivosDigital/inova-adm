@@ -1,6 +1,16 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { MultiSelectDropdown } from "@/components/ui/multi-select-dropdown";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
 import type {
@@ -14,21 +24,124 @@ import {
   ArrowRight,
   Calendar,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Eye,
-  Filter,
   Loader2,
+  Lock,
   Minus,
   Plus,
   Route as RouteIcon,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPeriodDifferenceWarning } from "./periodWarning";
+import toast from "react-hot-toast";
+import { getRoutePeriodMismatchWarning } from "./periodWarning";
 import { PlanningRoutesFiltersPanel } from "./PlanningRoutesFiltersPanel";
 import { RouteFormModal } from "./RouteFormModal";
 import { RouteSelectModal } from "./RouteSelectModal";
 import { ServiceDetailsModal } from "./ServiceDetailsModal";
+
+/** Colunas disponíveis para as tabelas de serviços (campos da modal de detalhes). */
+const SERVICE_TABLE_COLUMNS = [
+  { id: "equipment", label: "Equipamento" },
+  { id: "tag", label: "Tag" },
+  { id: "equipmentCode", label: "Código do equipamento" },
+  { id: "set", label: "Conjunto" },
+  { id: "subset", label: "SubConjunto" },
+  { id: "cip", label: "CIP" },
+  { id: "cipCode", label: "Código CIP" },
+  { id: "sector", label: "Setor" },
+  { id: "equipmentType", label: "Tipo de equipamento" },
+  { id: "manufacturer", label: "Fabricante" },
+  { id: "costCenter", label: "Centro de custo" },
+  { id: "safetyCondition", label: "Condição de segurança" },
+  { id: "lubricationSystem", label: "Sistema de lubrificação" },
+  { id: "mainComponent", label: "Componente principal" },
+  { id: "powerUnit", label: "Unidade de potência" },
+  { id: "serviceModel", label: "Serviço" },
+  { id: "serviceModelDescription", label: "Descrição do serviço" },
+  { id: "period", label: "Período" },
+  { id: "periodDays", label: "Dias (período)" },
+  { id: "priority", label: "Prioridade" },
+  { id: "executionTime", label: "Tempo de execução" },
+  { id: "team", label: "Equipe" },
+  { id: "serviceCondition", label: "Condição do serviço" },
+  { id: "jobSystem", label: "Sistema de trabalho" },
+] as const;
+
+export type ServiceTableColumnId = (typeof SERVICE_TABLE_COLUMNS)[number]["id"];
+
+/** Colunas que sempre permanecem visíveis (não podem ser removidas). */
+const FIXED_SERVICE_TABLE_COLUMN_IDS: ServiceTableColumnId[] = [
+  "equipment",
+  "tag",
+  "executionTime",
+  "cip",
+];
+
+function getServiceCellValue(service: CipService | undefined, columnId: string): string | number {
+  if (!service) return "—";
+  const eq = service.cip?.subset?.set?.equipment;
+  const set = service.cip?.subset?.set;
+  const subset = service.cip?.subset;
+  const cip = service.cip;
+  switch (columnId) {
+    case "equipment":
+      return eq?.name ?? eq?.tag ?? "—";
+    case "tag":
+      return eq?.tag ?? "—";
+    case "equipmentCode":
+      return eq?.code ?? "—";
+    case "set":
+      return set?.name ?? "—";
+    case "subset":
+      return subset?.name ?? "—";
+    case "cip":
+      return cip?.name ?? "—";
+    case "cipCode":
+      return cip?.code ?? "—";
+    case "sector":
+      return eq?.sector?.name ?? "—";
+    case "equipmentType":
+      return eq?.equipmentType?.name ?? "—";
+    case "manufacturer":
+      return eq?.manufacturer?.name ?? "—";
+    case "costCenter":
+      return eq?.costCenter?.name ?? "—";
+    case "safetyCondition":
+      return eq?.safetyCondition?.name ?? "—";
+    case "lubricationSystem":
+      return eq?.lubricationSystem?.name ?? "—";
+    case "mainComponent":
+      return eq?.mainComponent?.name ?? "—";
+    case "powerUnit":
+      return eq?.powerUnit?.name ?? "—";
+    case "serviceModel":
+      return service.serviceModel?.name ?? "—";
+    case "serviceModelDescription":
+      return service.serviceModel?.description ?? "—";
+    case "period":
+      return service.period?.name ?? "—";
+    case "periodDays":
+      return service.period?.days != null ? service.period.days : "—";
+    case "priority":
+      return service.priority?.name ?? "—";
+    case "executionTime":
+      return service.executionTime?.minutes != null
+        ? `${service.executionTime.minutes} min`
+        : service.executionTime?.name ?? "—";
+    case "team":
+      return service.team?.name ?? "—";
+    case "serviceCondition":
+      return service.serviceCondition?.name ?? "—";
+    case "jobSystem":
+      return service.jobSystem?.name ?? "—";
+    default:
+      return "—";
+  }
+}
 
 /** Resumo dos campos de equipamento para exibir nas listas (setor, tipo, fabricante). */
 function equipmentSummary(service: CipService | undefined): string {
@@ -54,14 +167,35 @@ export function PlanningRoutesContent() {
   const [viewingRoute, setViewingRoute] = useState<Route | null>(null);
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [selectedRouteServiceIds, setSelectedRouteServiceIds] = useState<Set<string>>(new Set());
-  const [showFilters, setShowFilters] = useState(false);
+  const [filtersAccordionOpen, setFiltersAccordionOpen] = useState(false);
   const [filters, setFilters] = useState<FilterServicesPayload>({});
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [showSelectRouteModal, setShowSelectRouteModal] = useState(false);
   const [serviceForDetails, setServiceForDetails] = useState<CipService | null>(null);
-  const [routesListExpanded, setRoutesListExpanded] = useState(true);
-  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [routesAccordionOpen, setRoutesAccordionOpen] = useState(true);
+  const [visibleColumns, setVisibleColumns] = useState<ServiceTableColumnId[]>(() => [
+    ...FIXED_SERVICE_TABLE_COLUMN_IDS,
+  ]);
+  const [pageAvailable, setPageAvailable] = useState(1);
+  const [totalAvailable, setTotalAvailable] = useState(0);
+  const [routeServicesPaginated, setRouteServicesPaginated] = useState<{
+    routeCipServices: RouteCipServiceItem[];
+    total: number;
+    page: number;
+    limit: number;
+  } | null>(null);
+  const [loadingRouteServices, setLoadingRouteServices] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger";
+    confirmLabel?: string;
+  }>({ open: false, title: "", description: "", onConfirm: () => {} });
+
+  const limitPerPage = 20;
 
   const routeUrl = useMemo(() => {
     if (!effectiveCompanyId) return null;
@@ -73,25 +207,71 @@ export function PlanningRoutesContent() {
     const res = await GetAPI(routeUrl, true);
     if (res.status === 200 && res.body?.routes) {
       setRoutes(res.body.routes as Route[]);
+    } else if (res.status !== 200) {
+      toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar rotas.");
     }
   }, [routeUrl, GetAPI]);
 
-  const fetchCipServices = useCallback(async (payload: FilterServicesPayload) => {
-    if (!effectiveCompanyId) return;
-    setLoadingServices(true);
-    const res = await PostAPI("/filter-services", { ...payload, companyId: effectiveCompanyId }, true);
-    if (res.status === 200 && res.body?.cipServices) {
-      setCipServices(res.body.cipServices as CipService[]);
-      setSelectedServiceIds(new Set());
-    }
-    setLoadingServices(false);
-  }, [effectiveCompanyId, PostAPI]);
+  const fetchCipServices = useCallback(
+    async (payload: FilterServicesPayload, page = 1) => {
+      if (!effectiveCompanyId) return;
+      setLoadingServices(true);
+      const res = await PostAPI(
+        "/filter-services",
+        {
+          ...payload,
+          companyId: effectiveCompanyId,
+          page,
+          limit: limitPerPage,
+          excludeWithServiceSchedule: true,
+        },
+        true
+      );
+      if (res.status === 200 && res.body?.cipServices) {
+        setCipServices(res.body.cipServices as CipService[]);
+        setTotalAvailable(typeof res.body.total === "number" ? res.body.total : 0);
+        setPageAvailable(page);
+        setSelectedServiceIds(new Set());
+      } else if (res.status !== 200) {
+        toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar serviços.");
+      }
+      setLoadingServices(false);
+    },
+    [effectiveCompanyId, PostAPI]
+  );
+
+  const fetchRouteServicesPaginated = useCallback(
+    async (routeId: string, page = 1) => {
+      setLoadingRouteServices(true);
+      const res = await GetAPI(
+        `/route/single/${routeId}/services?page=${page}&limit=${limitPerPage}`,
+        true
+      );
+      if (res.status === 200 && res.body?.routeCipServices) {
+        setRouteServicesPaginated({
+          routeCipServices: res.body.routeCipServices as RouteCipServiceItem[],
+          total: typeof res.body.total === "number" ? res.body.total : 0,
+          page: typeof res.body.page === "number" ? res.body.page : page,
+          limit: typeof res.body.limit === "number" ? res.body.limit : limitPerPage,
+        });
+      } else {
+        setRouteServicesPaginated(null);
+        if (res.status !== 200) {
+          toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar serviços da rota.");
+        }
+      }
+      setLoadingRouteServices(false);
+    },
+    [GetAPI]
+  );
 
   const fetchRouteCipServices = useCallback(async () => {
     if (!effectiveCompanyId) return;
     const res = await GetAPI(`/route/company/${effectiveCompanyId}/route-services`, true);
     if (res.status === 200 && res.body?.routeCipServices) {
       setRouteCipServices(res.body.routeCipServices as RouteCipServiceItem[]);
+    } else if (res.status !== 200) {
+      toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar vínculos rota-serviço.");
     }
   }, [effectiveCompanyId, GetAPI]);
 
@@ -100,27 +280,95 @@ export function PlanningRoutesContent() {
       setRoutes([]);
       setCipServices([]);
       setRouteCipServices([]);
+      setPageAvailable(1);
+      setTotalAvailable(0);
+      setRouteServicesPaginated(null);
       setLoading(false);
       return;
     }
     setLoading(true);
+    setPageAvailable(1);
     Promise.all([
       fetchRoutes(),
-      fetchCipServices(filters),
+      fetchCipServices(filters, 1),
       fetchRouteCipServices(),
     ]).finally(() => setLoading(false));
   }, [effectiveCompanyId, fetchRoutes, fetchRouteCipServices]);
 
+  useEffect(() => {
+    if (!viewingRoute) {
+      setRouteServicesPaginated(null);
+      return;
+    }
+    setRouteServicesPaginated(null);
+    fetchRouteServicesPaginated(viewingRoute.id, 1);
+  }, [viewingRoute?.id, fetchRouteServicesPaginated]);
+
   const applyFilters = useCallback(
     (newFilters: FilterServicesPayload) => {
       setFilters(newFilters);
-      fetchCipServices(newFilters);
-      setShowFilters(false);
+      setPageAvailable(1);
+      fetchCipServices(newFilters, 1);
+      setFiltersAccordionOpen(false);
     },
     [fetchCipServices]
   );
 
   const permanentRoutes = useMemo(() => routes.filter((r) => !r.isTemporary), [routes]);
+
+  const columnsToShow = useMemo(
+    () =>
+      SERVICE_TABLE_COLUMNS.filter(
+        (c) => visibleColumns.includes(c.id) || FIXED_SERVICE_TABLE_COLUMN_IDS.includes(c.id)
+      ),
+    [visibleColumns]
+  );
+
+  const columnDropdownItems = useMemo(
+    () => SERVICE_TABLE_COLUMNS.map((c) => ({ id: c.id, name: c.label })),
+    []
+  );
+
+  const handleColumnToggle = useCallback((columnId: string, checked: boolean) => {
+    if (!checked && FIXED_SERVICE_TABLE_COLUMN_IDS.includes(columnId as ServiceTableColumnId)) {
+      return;
+    }
+    setVisibleColumns((prev) =>
+      checked ? [...prev, columnId as ServiceTableColumnId] : prev.filter((c) => c !== columnId)
+    );
+  }, []);
+
+  const handleSelectAllColumns = useCallback(() => {
+    setVisibleColumns(SERVICE_TABLE_COLUMNS.map((c) => c.id));
+  }, []);
+
+  const handleDeselectAllColumns = useCallback(() => {
+    setVisibleColumns([...FIXED_SERVICE_TABLE_COLUMN_IDS]);
+  }, []);
+
+  const totalPagesAvailable = Math.max(1, Math.ceil(totalAvailable / limitPerPage));
+  const totalPagesRoute = useMemo(() => {
+    const total = routeServicesPaginated?.total ?? 0;
+    return Math.max(1, Math.ceil(total / limitPerPage));
+  }, [routeServicesPaginated?.total]);
+
+  const goToPageAvailable = useCallback(
+    (page: number) => {
+      const p = Math.max(1, Math.min(page, totalPagesAvailable));
+      setPageAvailable(p);
+      fetchCipServices(filters, p);
+    },
+    [fetchCipServices, filters, totalPagesAvailable]
+  );
+
+  const goToPageRoute = useCallback(
+    (page: number) => {
+      if (!viewingRoute) return;
+      const p = Math.max(1, Math.min(page, totalPagesRoute));
+      fetchRouteServicesPaginated(viewingRoute.id, p);
+    },
+    [viewingRoute, totalPagesRoute, fetchRouteServicesPaginated]
+  );
 
   const activeFiltersCount = useMemo(() => {
     const keys: (keyof FilterServicesPayload)[] = [
@@ -149,8 +397,8 @@ export function PlanningRoutesContent() {
 
   const servicesInViewingRoute = useMemo(() => {
     if (!viewingRoute) return [];
-    return routeCipServices.filter((rcs) => rcs.routeId === viewingRoute.id);
-  }, [routeCipServices, viewingRoute]);
+    return routeServicesPaginated?.routeCipServices ?? [];
+  }, [viewingRoute, routeServicesPaginated]);
 
   const cipServicesAvailableForRoute = useMemo(() => {
     const idsInPermanent = new Set(
@@ -169,11 +417,12 @@ export function PlanningRoutesContent() {
     return totalExecutionMinutes(services);
   }, [selectedServiceIds, cipServicesAvailableForRoute]);
 
-  /** Tempo total (min) dos serviços da rota visualizada */
-  const totalExecutionMinutesViewingRoute = useMemo(
-    () => totalExecutionMinutes(servicesInViewingRoute),
-    [servicesInViewingRoute]
-  );
+  /** Tempo total (min) dos serviços da rota visualizada (roda inteira, para exibir no header) */
+  const totalExecutionMinutesViewingRoute = useMemo(() => {
+    if (!viewingRoute) return 0;
+    const items = routeCipServices.filter((rcs) => rcs.routeId === viewingRoute.id);
+    return totalExecutionMinutes(items);
+  }, [viewingRoute, routeCipServices]);
 
   /** Mapa routeId -> tempo total em minutos (para exibir nos chips) */
   const totalExecutionMinutesByRouteId = useMemo(() => {
@@ -185,42 +434,16 @@ export function PlanningRoutesContent() {
     return map;
   }, [permanentRoutes, routeCipServices]);
 
-  /** Mapa routeId -> periodicidade média em dias (para rotas existentes) */
-  const averagePeriodDaysByRouteId = useMemo(() => {
-    const map = new Map<string, number | null>();
-    for (const route of permanentRoutes) {
-      const items = routeCipServices.filter((rcs) => rcs.routeId === route.id);
-      const daysList = items
-        .map((rcs) => rcs.cipService?.period?.days)
-        .filter((d): d is number => typeof d === "number" && d > 0);
-      if (daysList.length === 0) {
-        map.set(route.id, null);
-      } else {
-        const sum = daysList.reduce((a, b) => a + b, 0);
-        map.set(route.id, Math.round(sum / daysList.length));
-      }
-    }
-    return map;
-  }, [permanentRoutes, routeCipServices]);
-
-  /** Aviso quando períodos dos serviços selecionados forem muito diferentes */
-  const periodWarning = useMemo(() => {
+  /** Aviso quando algum serviço selecionado tem periodicidade diferente da rota (ao adicionar à rota visualizada ou ao criar nova) */
+  const routePeriodMismatchWarning = useMemo(() => {
     if (selectedServiceIds.size === 0) return { shouldWarn: false as const };
-    return getPeriodDifferenceWarning(cipServicesAvailableForRoute, selectedServiceIds);
-  }, [selectedServiceIds, cipServicesAvailableForRoute]);
-
-  /** Periodicidade estimada da rota = média (em dias) dos serviços selecionados */
-  const averagePeriodInfo = useMemo(() => {
-    if (selectedServiceIds.size === 0) return null;
-    const selected = cipServicesAvailableForRoute.filter((cs) => selectedServiceIds.has(cs.id));
-    const daysList = selected
-      .map((s) => s.period?.days)
-      .filter((d): d is number => typeof d === "number" && d > 0);
-    if (daysList.length === 0) return { averageDays: null, withDays: 0, total: selected.length };
-    const sum = daysList.reduce((a, b) => a + b, 0);
-    const averageDays = Math.round(sum / daysList.length);
-    return { averageDays, withDays: daysList.length, total: selected.length };
-  }, [selectedServiceIds, cipServicesAvailableForRoute]);
+    const routePeriodId = viewingRoute?.routePeriodId ?? null;
+    return getRoutePeriodMismatchWarning(
+      routePeriodId,
+      cipServicesAvailableForRoute,
+      selectedServiceIds
+    );
+  }, [selectedServiceIds, cipServicesAvailableForRoute, viewingRoute?.routePeriodId]);
 
   const cipServiceIdsToRemove = useMemo(() => {
     if (!viewingRoute) return [];
@@ -302,7 +525,6 @@ export function PlanningRoutesContent() {
     setEditingRoute(null);
     fetchRoutes();
     fetchRouteCipServices();
-    setToastMessage({ type: "success", text: "Rota salva com sucesso." });
   }, [fetchRoutes, fetchRouteCipServices]);
 
   const handleAddToRoute = useCallback(
@@ -310,7 +532,7 @@ export function PlanningRoutesContent() {
       const availableIds = new Set(cipServicesAvailableForRoute.map((cs) => cs.id));
       const validIds = Array.from(selectedServiceIds).filter((id) => availableIds.has(id));
       if (validIds.length === 0) {
-        setToastMessage({ type: "error", text: "Nenhum serviço válido selecionado." });
+        toast.error("Nenhum serviço válido selecionado.");
         return;
       }
       const res = await PostAPI(`/route/single/${routeId}/services`, { cipServiceIds: validIds }, true);
@@ -318,12 +540,24 @@ export function PlanningRoutesContent() {
         setSelectedServiceIds(new Set());
         fetchRouteCipServices();
         fetchRoutes();
-        setToastMessage({ type: "success", text: "Serviços adicionados à rota." });
+        if (viewingRoute?.id === routeId) {
+          fetchRouteServicesPaginated(routeId, routeServicesPaginated?.page ?? 1);
+        }
+        toast.success("Serviços adicionados à rota.");
       } else {
-        setToastMessage({ type: "error", text: (res.body as { message?: string })?.message ?? "Erro ao adicionar." });
+        toast.error((res.body as { message?: string })?.message ?? "Erro ao adicionar serviços.");
       }
     },
-    [selectedServiceIds, cipServicesAvailableForRoute, PostAPI, fetchRouteCipServices, fetchRoutes]
+    [
+        selectedServiceIds,
+        cipServicesAvailableForRoute,
+        PostAPI,
+        fetchRouteCipServices,
+        fetchRoutes,
+        viewingRoute?.id,
+        routeServicesPaginated?.page,
+        fetchRouteServicesPaginated,
+      ]
   );
 
   const handleRemoveFromRoute = useCallback(async () => {
@@ -337,26 +571,74 @@ export function PlanningRoutesContent() {
       setSelectedRouteServiceIds(new Set());
       fetchRouteCipServices();
       fetchRoutes();
-      setToastMessage({ type: "success", text: "Serviços removidos da rota." });
+      fetchRouteServicesPaginated(viewingRoute.id, routeServicesPaginated?.page ?? 1);
+      toast.success("Serviços removidos da rota.");
     } else {
-      setToastMessage({ type: "error", text: (res.body as { message?: string })?.message ?? "Erro ao remover." });
+      toast.error((res.body as { message?: string })?.message ?? "Erro ao remover serviços.");
     }
-  }, [viewingRoute, cipServiceIdsToRemove, PostAPI, fetchRouteCipServices, fetchRoutes]);
+  }, [
+    viewingRoute,
+    cipServiceIdsToRemove,
+    PostAPI,
+    fetchRouteCipServices,
+    fetchRoutes,
+    routeServicesPaginated?.page,
+    fetchRouteServicesPaginated,
+  ]);
 
   const handleDeleteRoute = useCallback(
     async (route: Route) => {
-      if (!confirm(`Excluir a rota "${route.code} - ${route.name}"?`)) return;
       const res = await DeleteAPI(`/route/single/${route.id}`, true);
       if (res.status === 200 || (res as { status?: number }).status === 204) {
         if (viewingRoute?.id === route.id) setViewingRoute(null);
         fetchRoutes();
         fetchRouteCipServices();
-        setToastMessage({ type: "success", text: "Rota excluída." });
+        toast.success("Rota excluída.");
       } else {
-        setToastMessage({ type: "error", text: (res.body as { message?: string })?.message ?? "Erro ao excluir." });
+        toast.error((res.body as { message?: string })?.message ?? "Erro ao excluir rota.");
       }
     },
     [viewingRoute, DeleteAPI, fetchRoutes, fetchRouteCipServices]
+  );
+
+  const handleDeleteRouteClick = useCallback(
+    async (route: Route) => {
+      try {
+        const res = await GetAPI(`/route/single/${route.id}/deletion-info`, true);
+        if (res.status !== 200 || !res.body) {
+          toast.error("Não foi possível verificar a rota.");
+          return;
+        }
+        const { workOrderCount = 0, routeScheduleCount = 0 } = res.body as {
+          workOrderCount?: number;
+          routeScheduleCount?: number;
+        };
+        const hasDependencies = workOrderCount > 0 || routeScheduleCount > 0;
+        const parts: string[] = [];
+        if (workOrderCount > 0) {
+          parts.push(
+            `${workOrderCount} ordem(ns) de serviço emitida(s)`
+          );
+        }
+        if (routeScheduleCount > 0) {
+          parts.push(`${routeScheduleCount} agendamento(s)`);
+        }
+        const description = hasDependencies
+          ? `Esta rota possui ${parts.join(" e ")}. Ao excluir a rota, todos serão removidos. Deseja continuar?`
+          : `Excluir a rota "${route.code} - ${route.name}"?`;
+        setConfirmDialog({
+          open: true,
+          title: "Excluir rota",
+          description,
+          confirmLabel: "Excluir",
+          variant: "danger",
+          onConfirm: () => handleDeleteRoute(route),
+        });
+      } catch {
+        toast.error("Erro ao verificar a rota.");
+      }
+    },
+    [GetAPI, handleDeleteRoute]
   );
 
   if (!effectiveCompanyId) {
@@ -381,102 +663,74 @@ export function PlanningRoutesContent() {
 
   return (
     <div className="space-y-6">
-      {/* Toast */}
-      {toastMessage && (
-        <div
-          className={`rounded-lg border p-4 ${
-            toastMessage.type === "success"
-              ? "border-green-200 bg-green-50 text-green-800"
-              : "border-red-200 bg-red-50 text-red-800"
-          }`}
+      {/* Accordion: Filtros */}
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <button
+          type="button"
+          onClick={() => setFiltersAccordionOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50"
         >
-          <p className="text-sm">{toastMessage.text}</p>
-          <button
-            type="button"
-            className="mt-2 text-sm underline"
-            onClick={() => setToastMessage(null)}
-          >
-            Fechar
-          </button>
-        </div>
-      )}
-
-      {/* Ações da aba (filtros e nova rota) */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Filter className="h-4 w-4" />
+          <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             Filtros
             {activeFiltersCount > 0 && (
               <Badge variant="default" className="ml-0.5">
                 {activeFiltersCount}
               </Badge>
             )}
-          </button>
-          <button
-            type="button"
-            onClick={handleCreateRoute}
-            className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Rota
-          </button>
-        </div>
+          </span>
+          {filtersAccordionOpen ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+          )}
+        </button>
+        {filtersAccordionOpen && (
+          <div className="border-t border-slate-100 bg-slate-50 p-4">
+            <PlanningRoutesFiltersPanel
+              filters={filters}
+              onApply={applyFilters}
+              onClose={() => setFiltersAccordionOpen(false)}
+            />
+          </div>
+        )}
       </div>
 
-      {/* Filters panel */}
-      {showFilters && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <PlanningRoutesFiltersPanel
-            filters={filters}
-            onApply={applyFilters}
-            onClose={() => setShowFilters(false)}
-          />
-        </div>
-      )}
-
-      {/* Rotas (chips) */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-700">
+      {/* Accordion: Rotas (só título + chevron quando fechado) */}
+      <div className="rounded-lg border border-slate-200 bg-white">
+        <button
+          type="button"
+          onClick={() => setRoutesAccordionOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50"
+        >
+          <span className="text-sm font-semibold text-slate-700">
             Rotas ({permanentRoutes.length})
-          </h2>
-          {permanentRoutes.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setRoutesListExpanded((prev) => !prev)}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
-              title={routesListExpanded ? "Ver apenas a primeira linha" : "Ver todas"}
-            >
-              {routesListExpanded ? (
-                <>
-                  <ChevronUp className="h-3.5 w-3.5" />
-                  Fechar
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-3.5 w-3.5" />
-                  Ver todas
-                </>
-              )}
-            </button>
+          </span>
+          {routesAccordionOpen ? (
+            <ChevronUp className="h-4 w-4 shrink-0 text-slate-500" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
           )}
-        </div>
-        {permanentRoutes.length === 0 ? (
-          <p className="text-slate-500 text-sm">
-            Nenhuma rota cadastrada. Clique em &quot;Nova Rota&quot; para criar.
-          </p>
-        ) : (
-          <div
-            className={`flex flex-wrap gap-2 transition-[max-height] duration-200 ${
-              routesListExpanded ? "max-h-none" : "max-h-[3.25rem] overflow-hidden"
-            }`}
-          >
-            {permanentRoutes.map((route) => (
+        </button>
+        {routesAccordionOpen && (
+          <>
+            <div className="border-t border-slate-100 p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCreateRoute}
+                  className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Rota
+                </button>
+              </div>
+              {permanentRoutes.length === 0 ? (
+                <p className="text-slate-500 text-sm">
+                  Nenhuma rota cadastrada. Crie uma nova rota pelo botão acima ou adicione serviços à rota na tabela &quot;Serviços disponíveis&quot;.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {permanentRoutes.map((route) => (
               <div
                 key={route.id}
                 className="flex items-center gap-2 rounded-lg border bg-slate-50 px-3 py-2"
@@ -496,16 +750,15 @@ export function PlanningRoutesContent() {
                       ({formatExecutionMinutes(totalExecutionMinutesByRouteId.get(route.id) ?? 0)})
                     </span>
                   )}
-                  {averagePeriodDaysByRouteId.get(route.id) != null && (
+                  {route.period?.name && (
                     <span
                       className={`ml-1.5 inline-flex items-center gap-0.5 opacity-90 ${
                         viewingRoute?.id === route.id ? "text-white" : "text-slate-500"
                       }`}
-                      title="Periodicidade da rota (média dos serviços)"
+                      title="Período da rota"
                     >
                       <Calendar className="h-3.5 w-3.5" aria-hidden />
-                      {averagePeriodDaysByRouteId.get(route.id)} dia
-                      {averagePeriodDaysByRouteId.get(route.id) !== 1 ? "s" : ""}
+                      {route.period.name}
                     </span>
                   )}
                 </button>
@@ -519,7 +772,7 @@ export function PlanningRoutesContent() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDeleteRoute(route)}
+                  onClick={() => handleDeleteRouteClick(route)}
                   className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                   title="Excluir rota"
                 >
@@ -532,327 +785,337 @@ export function PlanningRoutesContent() {
         {viewingRoute && (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary font-medium">
             <span>Visualizando: {viewingRoute.code} – {viewingRoute.name}</span>
-            {averagePeriodDaysByRouteId.get(viewingRoute.id) != null && (
+            {viewingRoute.period?.name && (
               <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-primary">
                 <Calendar className="h-3 w-3" aria-hidden />
-                {averagePeriodDaysByRouteId.get(viewingRoute.id)} dia
-                {averagePeriodDaysByRouteId.get(viewingRoute.id) !== 1 ? "s" : ""}
+                {viewingRoute.period.name}
               </span>
             )}
           </p>
         )}
-      </div>
-
-      {/* Action bar: serviços selecionados, sem rota visualizada → Criar nova rota ou Adicionar a rota existente */}
-      {!viewingRoute && selectedServiceIds.size > 0 && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <p className="mb-2 text-sm font-semibold text-slate-900">
-            {selectedServiceIds.size} serviço(s) selecionado(s)
-            {totalExecutionMinutesSelected > 0 && (
-              <span className="ml-2 font-normal text-slate-600">
-                (tempo total estimado: {formatExecutionMinutes(totalExecutionMinutesSelected)})
-              </span>
-            )}
-          </p>
-          {averagePeriodInfo && (
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-              {averagePeriodInfo.averageDays != null ? (
-                <>
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700">
-                    <Calendar className="h-4 w-4 text-primary" aria-hidden />
-                    Periodicidade estimada da rota:
-                  </span>
-                  <Badge
-                    variant="secondary"
-                    className="bg-primary/10 text-primary font-semibold px-2.5 py-0.5"
-                    title={`Média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços selecionados`}
-                  >
-                    {averagePeriodInfo.averageDays} dia{averagePeriodInfo.averageDays !== 1 ? "s" : ""}
-                  </Badge>
-                  <span className="text-slate-500">
-                    {averagePeriodInfo.withDays < averagePeriodInfo.total
-                      ? `(média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços com periodicidade em dias)`
-                      : `(média entre os ${averagePeriodInfo.total} serviços selecionados)`}
-                  </span>
-                </>
-              ) : (
-                <span className="flex items-center gap-1.5 text-slate-500">
-                  <Calendar className="h-4 w-4" aria-hidden />
-                  Periodicidade: não foi possível calcular (nenhum serviço com periodicidade em dias).
-                </span>
-              )}
             </div>
-          )}
-          {periodWarning.shouldWarn && periodWarning.message ? (
-            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
-              {periodWarning.message}
+            {/* Tabela: Serviços nesta rota (dentro do accordion) */}
+            {viewingRoute && (
+              <div className="border-t border-slate-100 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-slate-900">
+                Serviços nesta rota
+                {totalExecutionMinutesViewingRoute > 0 && (
+                  <span className="ml-2 font-normal text-slate-600">
+                    (total: {formatExecutionMinutes(totalExecutionMinutesViewingRoute)})
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500">
+                Selecione os serviços para remover da rota.
+              </p>
             </div>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEditingRoute(null);
-                setShowRouteModal(true);
-              }}
-              className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-            >
-              <Plus className="h-4 w-4" />
-              Criar nova rota
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowSelectRouteModal(true)}
-              className="flex items-center gap-2 rounded-lg border border-primary bg-white px-4 py-2 text-sm font-medium text-primary hover:bg-primary/5"
-            >
-              <RouteIcon className="h-4 w-4" />
-              Adicionar a rota existente
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRemoveFromRoute}
+                disabled={cipServiceIdsToRemove.length === 0}
+                className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={cipServiceIdsToRemove.length === 0 ? "Selecione serviços na tabela para remover" : "Remover selecionados da rota"}
+              >
+                <Minus className="h-4 w-4" />
+                Remover da rota
+              </button>
+              <MultiSelectDropdown
+                label="Colunas"
+                items={columnDropdownItems}
+                selectedIds={visibleColumns}
+                onToggle={handleColumnToggle}
+                searchPlaceholder="Buscar coluna..."
+                className="w-[200px] shrink-0"
+                showSelectAllDeselectAll
+                onSelectAll={handleSelectAllColumns}
+                onDeselectAll={handleDeselectAllColumns}
+                fixedIds={FIXED_SERVICE_TABLE_COLUMN_IDS}
+              />
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Action bar: adicionar à rota visualizada */}
-      {viewingRoute && selectedServiceIds.size > 0 && (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <p className="mb-2 text-sm font-semibold text-slate-900">
-            {selectedServiceIds.size} serviço(s) selecionado(s) → {viewingRoute.code}
-            {totalExecutionMinutesSelected > 0 && (
-              <span className="ml-2 font-normal text-slate-600">
-                (+ {formatExecutionMinutes(totalExecutionMinutesSelected)})
-              </span>
-            )}
-          </p>
-          {averagePeriodInfo && (
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-              {averagePeriodInfo.averageDays != null ? (
-                <>
-                  <span className="flex items-center gap-1.5 font-medium text-slate-700">
-                    <Calendar className="h-4 w-4 text-primary" aria-hidden />
-                    Periodicidade estimada da rota:
-                  </span>
-                  <Badge
-                    variant="secondary"
-                    className="bg-primary/10 text-primary font-semibold px-2.5 py-0.5"
-                    title={`Média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços selecionados`}
-                  >
-                    {averagePeriodInfo.averageDays} dia{averagePeriodInfo.averageDays !== 1 ? "s" : ""}
-                  </Badge>
-                  <span className="text-slate-500">
-                    {averagePeriodInfo.withDays < averagePeriodInfo.total
-                      ? `(média entre ${averagePeriodInfo.withDays} de ${averagePeriodInfo.total} serviços com periodicidade em dias)`
-                      : `(média entre os ${averagePeriodInfo.total} serviços selecionados)`}
-                  </span>
-                </>
-              ) : (
-                <span className="flex items-center gap-1.5 text-slate-500">
-                  <Calendar className="h-4 w-4" aria-hidden />
-                  Periodicidade: não foi possível calcular (nenhum serviço com periodicidade em dias).
-                </span>
-              )}
+          {loadingRouteServices ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          )}
-          {periodWarning.shouldWarn && periodWarning.message ? (
-            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
-              {periodWarning.message}
+          ) : servicesInViewingRoute.length === 0 ? (
+            <div className="p-6 text-center text-sm text-slate-500">
+              Nenhum serviço nesta rota.
             </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => handleAddToRoute(viewingRoute.id)}
-            className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white"
-          >
-            <ArrowRight className="h-4 w-4" />
-            Adicionar à rota
-          </button>
-        </div>
-      )}
-
-      {/* Action bar: remover da rota */}
-      {viewingRoute && cipServiceIdsToRemove.length > 0 && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="mb-2 text-sm font-semibold text-slate-900">
-            {cipServiceIdsToRemove.length} serviço(s) selecionado(s) para remover
-          </p>
-          <button
-            type="button"
-            onClick={handleRemoveFromRoute}
-            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-          >
-            <Minus className="h-4 w-4" />
-            Remover da rota
-          </button>
-        </div>
-      )}
-
-      {/* Grid: Serviços nesta rota | Serviços disponíveis */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Serviços nesta rota */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-            <h3 className="font-semibold text-slate-900">
-              Serviços nesta rota
-              {viewingRoute && totalExecutionMinutesViewingRoute > 0 && (
-                <span className="ml-2 font-normal text-slate-600">
-                  (total: {formatExecutionMinutes(totalExecutionMinutesViewingRoute)})
-                </span>
-              )}
-            </h3>
-            <p className="text-xs text-slate-500">
-              {viewingRoute
-                ? "Selecione para remover da rota."
-                : "Selecione uma rota acima para ver os serviços."}
-            </p>
-            {viewingRoute && servicesInViewingRoute.length > 0 && (
-              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={allRouteServicesSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someRouteServicesSelected && !allRouteServicesSelected;
-                  }}
-                  onChange={toggleAllRouteServices}
-                  className="h-4 w-4 rounded border-slate-300 text-primary"
-                />
-                {allRouteServicesSelected ? "Desmarcar todos" : "Marcar todos"}
-              </label>
-            )}
-          </div>
-          <div className="max-h-[400px] overflow-y-auto p-4">
-            {!viewingRoute ? (
-              <p className="text-sm text-slate-500">Nenhuma rota selecionada.</p>
-            ) : servicesInViewingRoute.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhum serviço nesta rota.</p>
-            ) : (
-              <ul className="space-y-2">
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-100 hover:bg-transparent">
+                  <TableHead className="w-10">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={allRouteServicesSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someRouteServicesSelected && !allRouteServicesSelected;
+                        }}
+                        onChange={toggleAllRouteServices}
+                        className="h-4 w-4 rounded border-slate-300 text-primary"
+                      />
+                    </label>
+                  </TableHead>
+                  {columnsToShow.map((col) => (
+                    <TableHead
+                      key={col.id}
+                      className="text-slate-500"
+                      title={FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) ? "Campo fixo – não pode ser removido" : undefined}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        {col.label}
+                        {FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) && (
+                          <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                        )}
+                      </span>
+                    </TableHead>
+                  ))}
+                  <TableHead className="w-16">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {servicesInViewingRoute.map((rcs) => (
-                  <li
+                  <TableRow
                     key={rcs.id}
-                    className={`flex cursor-pointer items-start justify-between gap-2 rounded-lg border p-3 text-sm transition-colors ${
-                      selectedRouteServiceIds.has(rcs.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-slate-100 hover:bg-slate-50"
+                    className={`cursor-pointer border-slate-100 ${
+                      selectedRouteServiceIds.has(rcs.id) ? "bg-primary/5" : "hover:bg-slate-50/50"
                     }`}
                     onClick={() => toggleRouteServiceSelection(rcs.id)}
                   >
-                    <div className="min-w-0 flex-1">
-                      <span className="font-medium text-slate-800">
-                        {rcs.cipService?.cip?.subset?.set?.equipment?.name ?? "—"} /{" "}
-                        {rcs.cipService?.serviceModel?.name ?? "—"}
-                      </span>
-                      {equipmentSummary(rcs.cipService) && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {equipmentSummary(rcs.cipService)}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (rcs.cipService) setServiceForDetails(rcs.cipService);
-                      }}
-                      className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                      title="Ver detalhes do serviço"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <input
-                      type="checkbox"
-                      checked={selectedRouteServiceIds.has(rcs.id)}
-                      onChange={() => toggleRouteServiceSelection(rcs.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary"
-                    />
-                  </li>
+                    <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedRouteServiceIds.has(rcs.id)}
+                        onChange={() => toggleRouteServiceSelection(rcs.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-primary"
+                      />
+                    </TableCell>
+                    {columnsToShow.map((col) => (
+                      <TableCell key={col.id} className="text-slate-700 text-sm">
+                        {getServiceCellValue(rcs.cipService, col.id)}
+                      </TableCell>
+                    ))}
+                    <TableCell className="w-16" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={() => rcs.cipService && setServiceForDetails(rcs.cipService)}
+                        className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                        title="Ver detalhes do serviço"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </ul>
+              </TableBody>
+            </Table>
+          )}
+          {viewingRoute &&
+            routeServicesPaginated &&
+            routeServicesPaginated.total > limitPerPage && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
+                <p className="text-sm text-slate-600">
+                  {((routeServicesPaginated.page - 1) * limitPerPage + 1)}–
+                  {Math.min(
+                    routeServicesPaginated.page * limitPerPage,
+                    routeServicesPaginated.total
+                  )}{" "}
+                  de {routeServicesPaginated.total} serviços
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToPageRoute(routeServicesPaginated!.page - 1)}
+                    disabled={routeServicesPaginated.page <= 1}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <span className="text-sm text-slate-600">
+                    Página {routeServicesPaginated.page} de {totalPagesRoute}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToPageRoute(routeServicesPaginated!.page + 1)}
+                    disabled={routeServicesPaginated.page >= totalPagesRoute}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
             )}
-          </div>
-        </div>
+            </div>
+            )}
+          </>
+        )}
+      </div>
 
-        {/* Serviços disponíveis para adicionar */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+      {/* Tabela: Serviços disponíveis */}
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+          <div>
             <h3 className="font-semibold text-slate-900">Serviços disponíveis</h3>
             <p className="text-xs text-slate-500">
               Serviços ainda não vinculados a nenhuma rota. Selecione e adicione a uma rota.
             </p>
-            {cipServicesAvailableForRoute.length > 0 && (
-              <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={allAvailableSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someAvailableSelected && !allAvailableSelected;
-                  }}
-                  onChange={toggleAllAvailableServices}
-                  className="h-4 w-4 rounded border-slate-300 text-primary"
-                />
-                {allAvailableSelected ? "Desmarcar todos" : "Marcar todos"}
-              </label>
-            )}
           </div>
-          <div className="max-h-[400px] overflow-y-auto p-4">
-            {loadingServices ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : cipServicesAvailableForRoute.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                Nenhum serviço disponível (todos já estão em alguma rota ou não há resultados).
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {cipServicesAvailableForRoute.map((cs) => (
-                  <li
-                    key={cs.id}
-                    className={`flex cursor-pointer items-start justify-between gap-2 rounded-lg border p-3 text-sm transition-colors ${
-                      selectedServiceIds.has(cs.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-slate-100 hover:bg-slate-50"
-                    }`}
-                    onClick={() => toggleServiceSelection(cs.id)}
-                    // onClick={() => console.log(cs)}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <span className="font-medium text-slate-800">
-                        {cs.cip?.subset?.set?.equipment?.name ?? "—"} /{" "}
-                        {cs.serviceModel?.name ?? "—"}
-                        {cs.period?.name && (
-                          <span className="ml-1 text-slate-500">({cs.period.name})</span>
-                        )}
-                      </span>
-                      {equipmentSummary(cs) && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {equipmentSummary(cs)}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setServiceForDetails(cs);
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (viewingRoute && selectedServiceIds.size > 0) {
+                  if (routePeriodMismatchWarning.shouldWarn && routePeriodMismatchWarning.message) {
+                    setConfirmDialog({
+                      open: true,
+                      title: "Atenção",
+                      description: `${routePeriodMismatchWarning.message}\n\nDeseja continuar mesmo assim?`,
+                      confirmLabel: "Continuar",
+                      onConfirm: () => handleAddToRoute(viewingRoute.id),
+                    });
+                    return;
+                  }
+                  handleAddToRoute(viewingRoute.id);
+                } else if (selectedServiceIds.size > 0) {
+                  setShowSelectRouteModal(true);
+                } else {
+                  toast.error("Selecione ao menos um serviço.");
+                }
+              }}
+              disabled={selectedServiceIds.size === 0}
+              className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              title={selectedServiceIds.size === 0 ? "Selecione serviços na tabela" : viewingRoute ? "Adicionar à rota visualizada" : "Escolher rota para adicionar"}
+            >
+              <ArrowRight className="h-4 w-4" />
+              Adicionar à rota
+            </button>
+            <MultiSelectDropdown
+            label="Colunas"
+            items={columnDropdownItems}
+            selectedIds={visibleColumns}
+            onToggle={handleColumnToggle}
+            searchPlaceholder="Buscar coluna..."
+            className="w-[200px] shrink-0"
+            showSelectAllDeselectAll
+            onSelectAll={handleSelectAllColumns}
+            onDeselectAll={handleDeselectAllColumns}
+            fixedIds={FIXED_SERVICE_TABLE_COLUMN_IDS}
+          />
+          </div>
+        </div>
+        {loadingServices ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : cipServicesAvailableForRoute.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">
+            Nenhum serviço disponível (todos já estão em alguma rota, já possuem agendamento ou não há resultados).
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-100 hover:bg-transparent">
+                <TableHead className="w-10">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={allAvailableSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = someAvailableSelected && !allAvailableSelected;
                       }}
-                      className="shrink-0 rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                      title="Ver detalhes do serviço"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
+                      onChange={toggleAllAvailableServices}
+                      className="h-4 w-4 rounded border-slate-300 text-primary"
+                    />
+                  </label>
+                </TableHead>
+                {columnsToShow.map((col) => (
+                  <TableHead
+                    key={col.id}
+                    className="text-slate-500"
+                    title={FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) ? "Campo fixo – não pode ser removido" : undefined}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      {col.label}
+                      {FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) && (
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                      )}
+                    </span>
+                  </TableHead>
+                ))}
+                <TableHead className="w-16">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cipServicesAvailableForRoute.map((cs) => (
+                <TableRow
+                  key={cs.id}
+                  className={`cursor-pointer border-slate-100 ${
+                    selectedServiceIds.has(cs.id) ? "bg-primary/5" : "hover:bg-slate-50/50"
+                  }`}
+                  onClick={() => toggleServiceSelection(cs.id)}
+                >
+                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selectedServiceIds.has(cs.id)}
                       onChange={() => toggleServiceSelection(cs.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary"
+                      className="h-4 w-4 m-auto rounded border-slate-300 text-primary"
                     />
-                  </li>
-                ))}
-              </ul>
-            )}
+                  </TableCell>
+                  {columnsToShow.map((col) => (
+                    <TableCell key={col.id} className="text-slate-700 text-sm">
+                      {getServiceCellValue(cs, col.id)}
+                    </TableCell>
+                  ))}
+                  <TableCell className="w-16" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setServiceForDetails(cs)}
+                      className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                      title="Ver detalhes do serviço"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+        {totalAvailable > limitPerPage && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
+            <p className="text-sm text-slate-600">
+              {((pageAvailable - 1) * limitPerPage + 1)}–
+              {Math.min(pageAvailable * limitPerPage, totalAvailable)} de {totalAvailable} serviços
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => goToPageAvailable(pageAvailable - 1)}
+                disabled={pageAvailable <= 1}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm text-slate-600">
+                Página {pageAvailable} de {totalPagesAvailable}
+              </span>
+              <button
+                type="button"
+                onClick={() => goToPageAvailable(pageAvailable + 1)}
+                disabled={pageAvailable >= totalPagesAvailable}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <RouteFormModal
@@ -879,10 +1142,38 @@ export function PlanningRoutesContent() {
         routes={permanentRoutes}
         selectedServiceIds={Array.from(selectedServiceIds)}
         onConfirm={async (routeId) => {
+          const route = permanentRoutes.find((r) => r.id === routeId);
+          if (route) {
+            const warning = getRoutePeriodMismatchWarning(
+              route.routePeriodId ?? null,
+              cipServicesAvailableForRoute,
+              Array.from(selectedServiceIds)
+            );
+            if (warning.shouldWarn && warning.message) {
+              setConfirmDialog({
+                open: true,
+                title: "Atenção",
+                description: `${warning.message}\n\nDeseja continuar mesmo assim?`,
+                confirmLabel: "Continuar",
+                onConfirm: async () => {
+                  await handleAddToRoute(routeId);
+                  setSelectedServiceIds(new Set());
+                  await fetchRouteCipServices();
+                  setShowSelectRouteModal(false);
+                },
+              });
+              return;
+            }
+          }
           await handleAddToRoute(routeId);
           setSelectedServiceIds(new Set());
           await fetchRouteCipServices();
           setShowSelectRouteModal(false);
+        }}
+        onCreateNew={() => {
+          setShowSelectRouteModal(false);
+          setEditingRoute(null);
+          setShowRouteModal(true);
         }}
       />
 
@@ -890,6 +1181,19 @@ export function PlanningRoutesContent() {
         open={!!serviceForDetails}
         onClose={() => setServiceForDetails(null)}
         service={serviceForDetails}
+      />
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => !open && setConfirmDialog((prev) => ({ ...prev, open: false }))}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmLabel={confirmDialog.confirmLabel ?? "Confirmar"}
+        variant={confirmDialog.variant}
+        onConfirm={() => {
+          confirmDialog.onConfirm();
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
+        }}
       />
     </div>
   );

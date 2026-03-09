@@ -1,6 +1,7 @@
 "use client";
 
 import { useApiContext } from "@/context/ApiContext";
+import toast from "react-hot-toast";
 import { useCompany } from "@/context/CompanyContext";
 import { useCallback, useEffect, useState } from "react";
 
@@ -168,8 +169,10 @@ export function useFilterCatalogs() {
           powerUnitRes.status === 200 ? normalizeCatalog(powerUnitRes.body, "powerUnits") : [],
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao carregar catálogos");
+      const msg = e instanceof Error ? e.message : "Erro ao carregar catálogos";
+      setError(msg);
       setCatalogs(emptyCatalogs);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

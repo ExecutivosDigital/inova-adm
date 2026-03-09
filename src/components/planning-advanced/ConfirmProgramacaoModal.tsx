@@ -39,6 +39,8 @@ export function ConfirmProgramacaoModal({
   const dateStr = schedule
     ? format(new Date(schedule.scheduledStartAt), "dd/MM/yyyy HH:mm", { locale: ptBR })
     : "";
+  const duration = schedule?.duration ?? 0;
+  const hasAssignedWorkers = (schedule?.assignedWorkerIds?.length ?? 0) > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -48,6 +50,11 @@ export function ConfirmProgramacaoModal({
         </h3>
         <p className="mb-4 text-sm text-slate-600">
           Será emitida uma ou mais ordem(ns) de serviço para o agendamento abaixo.
+          {hasAssignedWorkers && (
+            <span className="mt-2 block text-primary">
+              Workers atribuídos no planejamento serão vinculados à(s) ordem(ns).
+            </span>
+          )}
         </p>
         {schedule && (
           <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -55,7 +62,7 @@ export function ConfirmProgramacaoModal({
               {isRoute ? (
                 <RouteIcon className="h-5 w-5 shrink-0 text-primary" />
               ) : (
-                <Wrench className="h-5 w-5 shrink-0 text-green-600" />
+                <Wrench className="h-5 w-5 shrink-0 text-primary" />
               )}
               <div>
                 <p className="font-medium text-slate-900">{displayName}</p>
@@ -63,7 +70,7 @@ export function ConfirmProgramacaoModal({
                   Data/hora: {dateStr}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Duração: {formatDuration(schedule.duration)}
+                  Duração: {formatDuration(duration)}
                 </p>
               </div>
             </div>

@@ -1,45 +1,39 @@
 import type { CipService } from "@/lib/route-types";
 
-const PERIOD_RATIO_THRESHOLD = 2;
-const PERIOD_DAYS_DIFF_THRESHOLD = 60;
-
 export interface PeriodWarningResult {
   shouldWarn: boolean;
   message?: string;
 }
 
 /**
- * Verifica se os períodos dos serviços selecionados são muito diferentes.
- * Retorna aviso quando a razão max/min > 2 ou a diferença em dias > 60.
+ * Verifica se algum serviço selecionado tem periodicidade diferente da rota.
+ * Exibe aviso quando a rota tem routePeriodId e algum serviço selecionado tem periodId !== routePeriodId.
  */
-export function getPeriodDifferenceWarning(
+export function getRoutePeriodMismatchWarning(
+  routePeriodId: string | null | undefined,
   services: CipService[],
   selectedIds?: Set<string> | string[]
 ): PeriodWarningResult {
+  if (!routePeriodId) return { shouldWarn: false };
+
   const ids = selectedIds instanceof Set ? Array.from(selectedIds) : selectedIds;
   const list = ids?.length
     ? services.filter((s) => ids.includes(s.id))
     : services;
 
-  const daysList = list
-    .map((s) => s.period?.days)
-    .filter((d): d is number => typeof d === "number" && d > 0);
+  const withDifferentPeriod = list.filter(
+    (s) => s.periodId != null && s.periodId !== routePeriodId
+  );
 
-  if (daysList.length < 2) {
-    return { shouldWarn: false };
-  }
+  if (withDifferentPeriod.length === 0) return { shouldWarn: false };
 
-  const minDays = Math.min(...daysList);
-  const maxDays = Math.max(...daysList);
-  const ratio = maxDays / minDays;
-  const diff = maxDays - minDays;
+  const names = withDifferentPeriod
+    .map((s) => s.serviceModel?.name || s.period?.name || "Serviço")
+    .slice(0, 3);
+  const more = withDifferentPeriod.length > 3 ? ` e mais ${withDifferentPeriod.length - 3}` : "";
 
-  if (ratio > PERIOD_RATIO_THRESHOLD || diff > PERIOD_DAYS_DIFF_THRESHOLD) {
-    return {
-      shouldWarn: true,
-      message: `Os períodos dos serviços selecionados são muito diferentes (de ${minDays} a ${maxDays} dias). Considere agrupar serviços com periodicidades próximas.`,
-    };
-  }
-
-  return { shouldWarn: false };
+  return {
+    shouldWarn: true,
+    message: `${withDifferentPeriod.length} serviço(s) selecionado(s) têm periodicidade diferente da rota (${names.join(", ")}${more}). Deseja continuar?`,
+  };
 }

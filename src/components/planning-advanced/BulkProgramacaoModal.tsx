@@ -8,6 +8,10 @@ interface BulkProgramacaoModalProps {
   open: boolean;
   onClose: () => void;
   schedules: ScheduleItem[];
+  /** IDs dos agendamentos que já possuem ordem de serviço emitida (serão ignorados) */
+  scheduleIdsWithOS: Set<string>;
+  /** Retorna quantas OS seriam emitidas para um agendamento */
+  getWOCountForSchedule: (schedule: ScheduleItem) => number;
   onConfirm: (startDate: string, endDate: string) => void;
   loading?: boolean;
 }
@@ -16,6 +20,8 @@ export function BulkProgramacaoModal({
   open,
   onClose,
   schedules,
+  scheduleIdsWithOS,
+  getWOCountForSchedule,
   onConfirm,
   loading = false,
 }: BulkProgramacaoModalProps) {
@@ -25,21 +31,29 @@ export function BulkProgramacaoModal({
   const summary = useMemo(() => {
     const start = new Date(startDate).getTime();
     const end = new Date(endDate + "T23:59:59.999Z").getTime();
-    let routeCount = 0;
-    let serviceCount = 0;
+    const inPeriod: ScheduleItem[] = [];
     for (const s of schedules) {
       const t = new Date(s.scheduledStartAt).getTime();
-      if (t >= start && t <= end) {
-        if (s.type === "route") routeCount += 1;
-        else serviceCount += 1;
-      }
+      if (t >= start && t <= end) inPeriod.push(s);
     }
-    return { routeCount, serviceCount, total: routeCount + serviceCount };
-  }, [schedules, startDate, endDate]);
+    const alreadyWithOS = inPeriod.filter((s) => scheduleIdsWithOS.has(s.id));
+    const toEmit = inPeriod.filter((s) => !scheduleIdsWithOS.has(s.id));
+    const countWOsToEmit = toEmit.reduce((acc, s) => acc + getWOCountForSchedule(s), 0);
+    const routeCount = inPeriod.filter((s) => s.type === "route").length;
+    const serviceCount = inPeriod.filter((s) => s.type === "service").length;
+    return {
+      totalInPeriod: inPeriod.length,
+      routeCount,
+      serviceCount,
+      alreadyWithOSCount: alreadyWithOS.length,
+      toEmitScheduleCount: toEmit.length,
+      countWOsToEmit,
+    };
+  }, [schedules, startDate, endDate, scheduleIdsWithOS, getWOCountForSchedule]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (summary.total === 0) return;
+    if (summary.countWOsToEmit === 0) return;
     onConfirm(startDate, endDate);
   };
 
@@ -52,7 +66,7 @@ export function BulkProgramacaoModal({
           Emitir ordens de serviço em lote
         </h3>
         <p className="mb-4 text-sm text-slate-600">
-          Selecione o período. Todas as rotas e serviços planejados nesse intervalo terão ordens de serviço emitidas.
+          Selecione o período. Todas as rotas e serviços planejados nesse intervalo terão ordens de serviço emitidas. Os workers atribuídos no planejamento serão vinculados a cada ordem.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -82,13 +96,22 @@ export function BulkProgramacaoModal({
           <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
             <p className="font-medium text-slate-700">Resumo do período</p>
             <p className="mt-1">
-              {summary.total} agendamento(s): {summary.routeCount} rota(s), {summary.serviceCount} serviço(s).
+              {summary.totalInPeriod} agendamento(s) no período: {summary.routeCount} rota(s), {summary.serviceCount} serviço(s).
             </p>
-            {summary.total > 0 && (
-              <p className="mt-1 text-xs text-slate-500">
-                Será emitida uma ou mais ordem(ns) de serviço por agendamento (cada ocorrência gera suas ordens).
+            {summary.alreadyWithOSCount > 0 && (
+              <p className="mt-1.5 text-amber-700">
+                <span className="font-medium">{summary.alreadyWithOSCount}</span> já possuem ordem de serviço emitida e serão ignorados.
               </p>
             )}
+            {summary.toEmitScheduleCount > 0 ? (
+              <p className="mt-1 text-slate-700">
+                <span className="font-medium">{summary.countWOsToEmit}</span> ordem(ns) de serviço serão emitidas para {summary.toEmitScheduleCount} agendamento(s).
+              </p>
+            ) : summary.totalInPeriod > 0 ? (
+              <p className="mt-1 text-slate-500">
+                Nenhuma nova ordem a emitir (todos os agendamentos do período já possuem OS).
+              </p>
+            ) : null}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -101,7 +124,7 @@ export function BulkProgramacaoModal({
             </button>
             <button
               type="submit"
-              disabled={loading || summary.total === 0}
+              disabled={loading || summary.countWOsToEmit === 0}
               className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
