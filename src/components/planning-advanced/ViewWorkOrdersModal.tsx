@@ -13,16 +13,23 @@ export interface WorkOrderSummary {
   scheduledAt: string | null;
   executedAt: string | null;
   completedAt: string | null;
-  cipServiceId: string;
+  cipServiceId: string | null;
   routeId: string | null;
   visibilityMode?: "all_with_team_role" | "assigned_workers";
   assignedWorkerIds?: string[];
   assignedWorkers?: Array<{ id: string; name: string }>;
   route?: { id: string; name: string; code: string } | null;
   cipService?: {
+    id?: string;
     serviceModel?: { name?: string } | null;
     cip?: { subset?: { set?: { equipment?: { name?: string; tag?: string } } } } | null;
   } | null;
+  /** Lista de serviços da WO (um para serviço avulso, N para rota). */
+  cipServices?: Array<{
+    id?: string;
+    serviceModel?: { name?: string } | null;
+    cip?: { subset?: { set?: { equipment?: { name?: string; tag?: string } } } } | null;
+  }>;
 }
 
 interface ViewWorkOrdersModalProps {
@@ -39,6 +46,17 @@ export function ViewWorkOrdersModal({
   if (!open) return null;
 
   const label = workOrders.length === 1 ? "Ordem de serviço" : "Ordens de serviço";
+  const firstService = (wo: WorkOrderSummary) =>
+    wo.cipService ?? wo.cipServices?.[0];
+  const serviceName = (wo: WorkOrderSummary) => {
+    const s = firstService(wo);
+    return (
+      s?.serviceModel?.name ||
+      s?.cip?.subset?.set?.equipment?.name ||
+      s?.cip?.subset?.set?.equipment?.tag ||
+      "Serviço"
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -51,11 +69,11 @@ export function ViewWorkOrdersModal({
             <p className="text-sm text-slate-500">Nenhuma ordem de serviço.</p>
           ) : (
             workOrders.map((wo) => {
-              const serviceName =
-                wo.cipService?.serviceModel?.name ||
-                wo.cipService?.cip?.subset?.set?.equipment?.name ||
-                wo.cipService?.cip?.subset?.set?.equipment?.tag ||
-                "Serviço";
+              const name = serviceName(wo);
+              const extraServices =
+                (wo.cipServices?.length ?? 0) > 1
+                  ? ` (+ ${wo.cipServices!.length - 1} outro(s) serviço(s))`
+                  : "";
               const { label: statusLabel, variant } = getWorkOrderStatusDisplay(wo.status);
               const statusClasses = WORK_ORDER_VARIANT_CLASSES[variant];
               return (
@@ -64,7 +82,7 @@ export function ViewWorkOrdersModal({
                   className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
                 >
                   <p className="font-medium text-slate-900">
-                    {serviceName}
+                    {name}{extraServices}
                     {wo.route && (
                       <span className="ml-2 text-slate-500">
                         · {wo.route.code} – {wo.route.name}

@@ -78,6 +78,7 @@ const FIXED_SERVICE_TABLE_COLUMN_IDS: ServiceTableColumnId[] = [
   "equipment",
   "tag",
   "executionTime",
+  "serviceModel",
   "cip",
 ];
 
