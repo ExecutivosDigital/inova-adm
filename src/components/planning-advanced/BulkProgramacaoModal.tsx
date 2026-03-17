@@ -66,7 +66,7 @@ export function BulkProgramacaoModal({
           Emitir ordens de serviço em lote
         </h3>
         <p className="mb-4 text-sm text-slate-600">
-          Selecione o período. Todas as rotas e serviços planejados nesse intervalo terão ordens de serviço emitidas. Os workers atribuídos no planejamento serão vinculados a cada ordem.
+          Selecione o período. Todas as rotas e serviços planejados nesse intervalo terão ordens de serviço emitidas. Os colaboradores atribuídos no planejamento serão vinculados a cada ordem.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminProfile } from "@/hooks/useAdminProfile";
 import { cn } from "@/lib/utils";
 import {
+  BookOpen,
   CalendarDays,
   ChevronLeft,
   LayoutDashboard,
@@ -34,6 +35,7 @@ const menuItems = [
   { icon: CalendarDays, label: "Programação", href: "/programacao", enabled: true },
   // { icon: CalendarDays, label: "Programação 2", href: "/programacao2", enabled: true },
   { icon: Users, label: "Pessoas", href: "/pessoas", enabled: false },
+  { icon: BookOpen, label: "Tutoriais", href: "/tutoriais", enabled: true },
   { icon: Settings, label: "Configurações", href: "/configuracoes", enabled: false },
 ];
 

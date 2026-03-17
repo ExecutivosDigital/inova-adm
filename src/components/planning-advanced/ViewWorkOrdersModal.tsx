@@ -23,12 +23,16 @@ export interface WorkOrderSummary {
     id?: string;
     serviceModel?: { name?: string } | null;
     cip?: { subset?: { set?: { equipment?: { name?: string; tag?: string } } } } | null;
+    cancellationReason?: string | null;
+    cancellationReasonName?: string | null;
   } | null;
   /** Lista de serviços da WO (um para serviço avulso, N para rota). */
   cipServices?: Array<{
     id?: string;
     serviceModel?: { name?: string } | null;
     cip?: { subset?: { set?: { equipment?: { name?: string; tag?: string } } } } | null;
+    cancellationReason?: string | null;
+    cancellationReasonName?: string | null;
   }>;
 }
 
@@ -56,6 +60,22 @@ export function ViewWorkOrdersModal({
       s?.cip?.subset?.set?.equipment?.tag ||
       "Serviço"
     );
+  };
+
+  /** Retorna lista de textos de problema(s) relatado(s) para uma WO. */
+  const getProblemsForWO = (wo: WorkOrderSummary): string[] => {
+    const problems: string[] = [];
+    const add = (reason: string | null | undefined, name: string | null | undefined) => {
+      const text = name || reason;
+      if (text && !problems.includes(text)) problems.push(text);
+    };
+    if (wo.cipService) {
+      add(wo.cipService.cancellationReason, wo.cipService.cancellationReasonName);
+    }
+    (wo.cipServices ?? []).forEach((s) => {
+      add(s.cancellationReason, s.cancellationReasonName);
+    });
+    return problems;
   };
 
   return (
@@ -109,13 +129,27 @@ export function ViewWorkOrdersModal({
                   )}
                   {(wo.visibilityMode === "assigned_workers" && (wo.assignedWorkers?.length ?? wo.assignedWorkerIds?.length)) ? (
                     <p className="mt-1 text-xs text-slate-500">
-                      Workers: {wo.assignedWorkers?.map((w) => w.name).join(", ") ?? wo.assignedWorkerIds?.length + " vinculado(s)"}
+                      Colaboradores: {wo.assignedWorkers?.map((w) => w.name).join(", ") ?? wo.assignedWorkerIds?.length + " vinculado(s)"}
                     </p>
                   ) : wo.visibilityMode != null && (
                     <p className="mt-1 text-xs text-slate-500">
-                      Visível para todos os workers com a função do time
+                      Visível para todos os colaboradores com a função do time
                     </p>
                   )}
+                  {(() => {
+                    const problems = getProblemsForWO(wo);
+                    if (problems.length === 0) return null;
+                    return (
+                      <div className="mt-2 rounded border border-amber-200 bg-amber-50/80 p-2">
+                        <p className="text-xs font-medium text-amber-800">Problema(s) relatado(s):</p>
+                        <ul className="mt-1 list-inside list-disc text-xs text-amber-800">
+                          {problems.map((text, i) => (
+                            <li key={i}>{text}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
                   <p className="mt-1 text-xs text-slate-400 font-mono">ID: {wo.id.slice(0, 8)}…</p>
                 </div>
               );

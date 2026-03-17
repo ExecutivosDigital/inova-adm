@@ -80,3 +80,33 @@ export function getSummaryVariantForWorkOrders(
   }
   return worst;
 }
+
+/** Tipo mínimo para helpers de conclusão/problemas (evita dependência de ViewWorkOrdersModal). */
+export interface WorkOrderForBadge {
+  status: string;
+  cipService?: {
+    cancellationReason?: string | null;
+    cancellationReasonName?: string | null;
+  } | null;
+  cipServices?: Array<{
+    cancellationReason?: string | null;
+    cancellationReasonName?: string | null;
+  }>;
+}
+
+/** Retorna true se todas as WOs do card estão com status completed. */
+export function allWorkOrdersCompleted(workOrders: WorkOrderForBadge[]): boolean {
+  if (!workOrders.length) return false;
+  return workOrders.every((wo) => wo.status === "completed");
+}
+
+/** Retorna true se alguma WO completed tem pelo menos um serviço com problema relatado. */
+export function hasCompletedWithProblems(workOrders: WorkOrderForBadge[]): boolean {
+  return workOrders.some((wo) => {
+    if (wo.status !== "completed") return false;
+    if (wo.cipService?.cancellationReason || wo.cipService?.cancellationReasonName) return true;
+    return (wo.cipServices ?? []).some(
+      (s) => s.cancellationReason || s.cancellationReasonName
+    );
+  });
+}

@@ -113,10 +113,10 @@ export function AssignWorkersModal({
       <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-900">
           <Users className="h-5 w-5 text-primary" />
-          Atribuir workers
+          Atribuir colaboradores
         </h3>
         <p className="mb-4 text-sm text-slate-600">
-          Selecione os workers que realizarão este agendamento. Deixe vazio para que todos os workers com a função do time possam ver a ordem de serviço quando emitida.
+          Selecione os colaboradores que realizarão este agendamento. Deixe vazio para que todos os colaboradores com a função do time possam ver a ordem de serviço quando emitida.
         </p>
         {schedule && (
           <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -135,26 +135,26 @@ export function AssignWorkersModal({
 
         {!canAssign ? (
           <p className="mb-4 text-sm text-amber-700">
-            Configure o time e as funções do serviço para poder atribuir workers.
+            Configure o time e as funções do serviço para poder atribuir colaboradores.
           </p>
         ) : (
           <div className="mb-6">
             {loadingWorkers ? (
               <p className="flex items-center gap-2 text-sm text-slate-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando workers...
+                Carregando colaboradores...
               </p>
             ) : workers.length === 0 ? (
               <p className="text-sm text-slate-500">
-                Nenhum worker encontrado com as funções do time.
+                Nenhum colaborador encontrado com as funções do time.
               </p>
             ) : (
               <MultiSelectDropdown
-                label="Workers"
+                label="Colaboradores"
                 items={workers}
                 selectedIds={selectedWorkerIds}
                 onToggle={handleToggleWorker}
-                searchPlaceholder="Buscar worker..."
+                searchPlaceholder="Buscar colaborador..."
                 listMaxHeight="12rem"
               />
             )}

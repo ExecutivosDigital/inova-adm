@@ -28,6 +28,8 @@ import type { WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOr
 import {
   getSummaryVariantForWorkOrders,
   WORK_ORDER_VARIANT_CLASSES,
+  allWorkOrdersCompleted,
+  hasCompletedWithProblems,
 } from "@/lib/work-order-status";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -424,15 +426,21 @@ function ReadOnlyScheduleCard({
               <span>•</span>
               <span>{formatDuration(schedule.duration)}</span>
               {workOrders.length > 0 && (() => {
-                const variant = getSummaryVariantForWorkOrders(workOrders) ?? "warning";
+                const allCompleted = allWorkOrdersCompleted(workOrders);
+                const withProblems = allCompleted && hasCompletedWithProblems(workOrders);
+                const variant = allCompleted ? "success" : (getSummaryVariantForWorkOrders(workOrders) ?? "warning");
                 const classes = WORK_ORDER_VARIANT_CLASSES[variant];
+                const badgeLabel = allCompleted ? (withProblems ? "* Concluída" : "Concluída") : "Emitida";
+                const badgeTitle = allCompleted
+                  ? (withProblems ? "Concluída com problema(s) relatado(s)" : "Ordem(ns) de serviço concluída(s)")
+                  : "Ordem(ns) de serviço";
                 return (
                   <span
                     className={cn("inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium", classes.bg, classes.text, classes.border)}
-                    title="Ordem(ns) de serviço"
+                    title={badgeTitle}
                   >
                     <CheckCircle2 className="h-2.5 w-2.5" />
-                    Emitida
+                    {badgeLabel}
                   </span>
                 );
               })()}
@@ -524,8 +532,8 @@ function DraggableScheduleCard({
               <span>•</span>
               <span>{formatDuration(schedule.duration)}</span>
               {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
-                <span className="text-primary" title="Workers atribuídos">
-                  · {schedule.assignedWorkerIds!.length} worker(s)
+                <span className="text-primary" title="Colaboradores atribuídos">
+                  · {schedule.assignedWorkerIds!.length} colaborador(es)
                 </span>
               )}
             </div>
@@ -541,7 +549,7 @@ function DraggableScheduleCard({
                 onAssignWorkers();
               }}
               className="rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-primary group-hover:opacity-100"
-              title="Atribuir workers"
+              title="Atribuir colaboradores"
             >
               <Users className="h-3.5 w-3.5" />
             </button>

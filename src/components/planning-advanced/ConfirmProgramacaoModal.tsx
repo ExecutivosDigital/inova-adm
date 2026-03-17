@@ -52,7 +52,7 @@ export function ConfirmProgramacaoModal({
           Será emitida uma ou mais ordem(ns) de serviço para o agendamento abaixo.
           {hasAssignedWorkers && (
             <span className="mt-2 block text-primary">
-              Workers atribuídos no planejamento serão vinculados à(s) ordem(ns).
+              Colaboradores atribuídos no planejamento serão vinculados à(s) ordem(ns).
             </span>
           )}
         </p>

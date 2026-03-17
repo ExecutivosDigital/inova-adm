@@ -167,7 +167,7 @@ function DraggableMonthScheduleCard({
             type="button"
             onClick={(e) => { e.stopPropagation(); onAssignWorkers(); }}
             className="rounded p-0.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
-            title="Atribuir workers"
+            title="Atribuir colaboradores"
           >
             <Users className="h-2.5 w-2.5" />
           </button>

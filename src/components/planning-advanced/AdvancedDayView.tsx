@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import {
   getSummaryVariantForWorkOrders,
   WORK_ORDER_VARIANT_CLASSES,
+  allWorkOrdersCompleted,
+  hasCompletedWithProblems,
 } from "@/lib/work-order-status";
 import {
   DndContext,
@@ -505,15 +507,21 @@ function ReadOnlyScheduleCard({
           <div className="flex items-center gap-2">
             <p className="truncate font-medium text-slate-900">{displayName}</p>
             {hasWorkOrders && (() => {
-              const variant = getSummaryVariantForWorkOrders(workOrders) ?? "warning";
+              const allCompleted = allWorkOrdersCompleted(workOrders);
+              const withProblems = allCompleted && hasCompletedWithProblems(workOrders);
+              const variant = allCompleted ? "success" : (getSummaryVariantForWorkOrders(workOrders) ?? "warning");
               const classes = WORK_ORDER_VARIANT_CLASSES[variant];
+              const badgeLabel = allCompleted ? (withProblems ? "* Concluída" : "Concluída") : "Emitida";
+              const badgeTitle = allCompleted
+                ? (withProblems ? "Concluída com problema(s) relatado(s)" : "Ordem(ns) de serviço concluída(s)")
+                : "Ordem(ns) de serviço emitida(s)";
               return (
                 <span
                   className={cn("flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium", classes.bg, classes.text, classes.border)}
-                  title="Ordem(ns) de serviço emitida(s)"
+                  title={badgeTitle}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Emitida
+                  {badgeLabel}
                 </span>
               );
             })()}
@@ -635,7 +643,7 @@ function DraggableScheduleCard({
           <p className="text-xs text-slate-500">
             Duração: {formatDuration(schedule.duration)}
             {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
-              <span className="ml-1 text-primary">· {schedule.assignedWorkerIds!.length} worker(s)</span>
+              <span className="ml-1 text-primary">· {schedule.assignedWorkerIds!.length} colaborador(es)</span>
             )}
           </p>
         </div>
@@ -649,7 +657,7 @@ function DraggableScheduleCard({
               onAssignWorkers();
             }}
             className="rounded p-1.5 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-primary group-hover:opacity-100"
-            title="Atribuir workers"
+            title="Atribuir colaboradores"
           >
             <Users className="h-4 w-4" />
           </button>
