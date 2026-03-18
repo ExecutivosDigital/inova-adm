@@ -13,14 +13,10 @@ import {
   BookOpen,
   CalendarDays,
   ChevronLeft,
-  LayoutDashboard,
   Lock,
   LogOut,
   Menu,
-  Package,
   Route,
-  Settings,
-  Users,
   Wrench
 } from "lucide-react";
 import Link from "next/link";
@@ -28,15 +24,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Visão Geral", href: "/", enabled: false },
   { icon: Wrench, label: "Equipamentos", href: "/equipamentos", enabled: true },
-  { icon: Package, label: "Materiais", href: "/materiais", enabled: false },
   { icon: Route, label: "Planejamento", href: "/planejamento", enabled: true },
   { icon: CalendarDays, label: "Programação", href: "/programacao", enabled: true },
-  // { icon: CalendarDays, label: "Programação 2", href: "/programacao2", enabled: true },
-  { icon: Users, label: "Pessoas", href: "/pessoas", enabled: false },
   { icon: BookOpen, label: "Tutoriais", href: "/tutoriais", enabled: true },
-  { icon: Settings, label: "Configurações", href: "/configuracoes", enabled: false },
 ];
 
 export function Sidebar() {
