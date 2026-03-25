@@ -17,22 +17,25 @@ export const WORK_ORDER_STATUS_LABELS: Record<string, string> = {
 };
 
 /** Variante de cor por status: success = verde, warning = laranja, danger = vermelho */
-export const WORK_ORDER_STATUS_VARIANT: Record<string, WorkOrderStatusVariant> = {
-  completed: "success",
-  pending: "warning",
-  scheduled: "warning",
-  in_progress: "warning",
-  emitted: "warning",
-  cancelled: "danger",
-  refused: "danger",
-  overdue: "danger",
-};
+export const WORK_ORDER_STATUS_VARIANT: Record<string, WorkOrderStatusVariant> =
+  {
+    completed: "success",
+    pending: "warning",
+    scheduled: "warning",
+    in_progress: "warning",
+    emitted: "warning",
+    cancelled: "danger",
+    refused: "danger",
+    overdue: "danger",
+  };
 
 export function getWorkOrderStatusLabel(status: string): string {
   return WORK_ORDER_STATUS_LABELS[status] ?? status;
 }
 
-export function getWorkOrderStatusVariant(status: string): WorkOrderStatusVariant {
+export function getWorkOrderStatusVariant(
+  status: string,
+): WorkOrderStatusVariant {
   return WORK_ORDER_STATUS_VARIANT[status] ?? "warning";
 }
 
@@ -41,7 +44,9 @@ export interface WorkOrderStatusDisplay {
   variant: WorkOrderStatusVariant;
 }
 
-export function getWorkOrderStatusDisplay(status: string): WorkOrderStatusDisplay {
+export function getWorkOrderStatusDisplay(
+  status: string,
+): WorkOrderStatusDisplay {
   return {
     label: getWorkOrderStatusLabel(status),
     variant: getWorkOrderStatusVariant(status),
@@ -49,7 +54,10 @@ export function getWorkOrderStatusDisplay(status: string): WorkOrderStatusDispla
 }
 
 /** Classes Tailwind para badge por variante */
-export const WORK_ORDER_VARIANT_CLASSES: Record<WorkOrderStatusVariant, { bg: string; text: string; border: string }> = {
+export const WORK_ORDER_VARIANT_CLASSES: Record<
+  WorkOrderStatusVariant,
+  { bg: string; text: string; border: string }
+> = {
   success: {
     bg: "bg-green-100",
     text: "text-green-800",
@@ -67,9 +75,27 @@ export const WORK_ORDER_VARIANT_CLASSES: Record<WorkOrderStatusVariant, { bg: st
   },
 };
 
+/** Verifica se todas as OS estão com status "completed". */
+export function allWorkOrdersCompleted(
+  workOrders: Array<{ status: string }>,
+): boolean {
+  return (
+    workOrders.length > 0 && workOrders.every((wo) => wo.status === "completed")
+  );
+}
+
+/** Verifica se há OS concluídas com problemas (cancelled ou refused). */
+export function hasCompletedWithProblems(
+  workOrders: Array<{ status: string }>,
+): boolean {
+  return workOrders.some(
+    (wo) => wo.status === "cancelled" || wo.status === "refused",
+  );
+}
+
 /** Para múltiplas OS: retorna a variante "mais crítica" (danger > warning > success) para exibir no card. */
 export function getSummaryVariantForWorkOrders(
-  workOrders: Array<{ status: string }>
+  workOrders: Array<{ status: string }>,
 ): WorkOrderStatusVariant | null {
   if (!workOrders.length) return null;
   const order: WorkOrderStatusVariant[] = ["danger", "warning", "success"];
@@ -92,21 +118,4 @@ export interface WorkOrderForBadge {
     cancellationReason?: string | null;
     cancellationReasonName?: string | null;
   }>;
-}
-
-/** Retorna true se todas as WOs do card estão com status completed. */
-export function allWorkOrdersCompleted(workOrders: WorkOrderForBadge[]): boolean {
-  if (!workOrders.length) return false;
-  return workOrders.every((wo) => wo.status === "completed");
-}
-
-/** Retorna true se alguma WO completed tem pelo menos um serviço com problema relatado. */
-export function hasCompletedWithProblems(workOrders: WorkOrderForBadge[]): boolean {
-  return workOrders.some((wo) => {
-    if (wo.status !== "completed") return false;
-    if (wo.cipService?.cancellationReason || wo.cipService?.cancellationReasonName) return true;
-    return (wo.cipServices ?? []).some(
-      (s) => s.cancellationReason || s.cancellationReasonName
-    );
-  });
 }

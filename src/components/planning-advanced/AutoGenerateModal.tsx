@@ -1,7 +1,7 @@
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { AutoGenerateOptions } from "@/lib/planning-advanced-types";
+import type { AutoGenerateOptions, PlanningBalanceMode } from "@/lib/planning-advanced-types";
 import { Calendar, Loader2, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -44,6 +44,7 @@ export function AutoGenerateModal({
   });
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [pendingOptions, setPendingOptions] = useState<AutoGenerateOptions | null>(null);
+  const [balanceMode, setBalanceMode] = useState<PlanningBalanceMode>("by_os_count");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +57,7 @@ export function AutoGenerateModal({
       return;
     }
 
-    setPendingOptions({ startDate, endDate });
+    setPendingOptions({ startDate, endDate, balanceMode });
     setShowGenerateConfirm(true);
   };
 
@@ -92,8 +93,9 @@ export function AutoGenerateModal({
   );
   
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
+      <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
+        <div className="my-4 w-full max-w-2xl max-h-[min(90dvh,900px)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-primary" />
           <h3 className="text-lg font-semibold text-slate-900">
@@ -102,12 +104,52 @@ export function AutoGenerateModal({
         </div>
         
         <p className="mb-4 text-sm text-slate-600">
-          O sistema irá gerar automaticamente agendamentos baseados na periodicidade
-          configurada de cada serviço, calculando as próximas datas a partir da
-          última execução.
+          O sistema gera agendamentos conforme a periodicidade de cada serviço ou rota. O modo de
+          balanceamento define como as datas são distribuídas no período.
         </p>
         
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset className="space-y-2">
+            <legend className="mb-1 block text-sm font-medium text-slate-700">
+              Modo de balanceamento
+            </legend>
+            <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+              <input
+                type="radio"
+                name="balanceMode"
+                value="by_os_count"
+                checked={balanceMode === "by_os_count"}
+                onChange={() => setBalanceMode("by_os_count")}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="min-w-0 text-sm break-words text-slate-700">
+                <span className="font-medium">Por quantidade de OS</span>
+                <span className="mt-0.5 block text-slate-600">
+                  Distribui as ordens de serviço de forma uniforme entre os dias úteis do período.
+                  Serviços com contagem a partir da última execução (e data de última execução
+                  preenchida) mantêm o calendário alinhado à periodicidade a partir dessa data.
+                </span>
+              </span>
+            </label>
+            <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+              <input
+                type="radio"
+                name="balanceMode"
+                value="by_hours"
+                checked={balanceMode === "by_hours"}
+                onChange={() => setBalanceMode("by_hours")}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="min-w-0 text-sm break-words text-slate-700">
+                <span className="font-medium">Por quantidade de horas</span>
+                <span className="mt-0.5 block text-slate-600">
+                  Coloca cada agendamento na data calculada estritamente pela periodicidade (comportamento
+                  anterior). O balanceamento fino por carga de horas será tratado em uma próxima etapa.
+                </span>
+              </span>
+            </label>
+          </fieldset>
+
           {/* Período */}
           <div className="space-y-3">
             <div>
@@ -142,8 +184,8 @@ export function AutoGenerateModal({
                   Período selecionado: <strong>{daysDiff} dias</strong>
                 </p>
                 <p className="mt-1">
-                  O sistema gerará agendamentos para todos os serviços com
-                  periodicidade configurada neste período.
+                  O total de OS geradas depende da periodicidade; no modo &quot;por quantidade de
+                  OS&quot;, a distribuição entre dias úteis tende a uniformizar a carga.
                 </p>
                 <p className="mt-1.5 text-blue-700">
                   Rotas e serviços que já possuem agendamento no período serão ignorados.
@@ -156,7 +198,8 @@ export function AutoGenerateModal({
           <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
             <p className="font-medium text-slate-700">Resumo do período</p>
             <p className="mt-1">
-              O sistema gerará novos agendamentos conforme a periodicidade. Agendamentos já existentes no período serão ignorados.
+              Novos agendamentos seguem a periodicidade configurada. Agendamentos já existentes no
+              período serão ignorados.
             </p>
             {summary.existingInPeriodCount > 0 && (
               <p className="mt-1.5 text-amber-700">
@@ -173,16 +216,15 @@ export function AutoGenerateModal({
             <p className="font-medium mb-1">Como funciona:</p>
             <ul className="list-disc list-inside space-y-1">
               <li>
-                Busca a última data de execução de cada serviço (ou usa a data
-                atual se não houver histórico)
+                No modo por OS: ancora serviços com &quot;contar período a partir da última
+                execução&quot; e última execução preenchida; os demais preenchem o período com a
+                mesma quantidade de visitas, em dias úteis balanceados.
               </li>
               <li>
-                Calcula as próximas datas baseado na periodicidade configurada
+                No modo por horas: cada data é obtida diretamente da periodicidade (como antes).
               </li>
-              <li>
-                Gera agendamentos respeitando dias úteis e horário de trabalho
-              </li>
-              <li>Você poderá ajustar manualmente após a geração</li>
+              <li>Respeita dias úteis da empresa e horário comercial configurado.</li>
+              <li>Você poderá ajustar manualmente após a geração.</li>
             </ul>
           </div>
           
@@ -215,6 +257,7 @@ export function AutoGenerateModal({
             </button>
           </div>
         </form>
+        </div>
       </div>
 
       <ConfirmDialog

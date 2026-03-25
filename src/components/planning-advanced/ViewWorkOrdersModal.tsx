@@ -9,6 +9,7 @@ import { ptBR } from "date-fns/locale";
 
 export interface WorkOrderSummary {
   id: string;
+  code?: number;
   status: string;
   scheduledAt: string | null;
   executedAt: string | null;
@@ -102,6 +103,11 @@ export function ViewWorkOrdersModal({
                   className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"
                 >
                   <p className="font-medium text-slate-900">
+                    {wo.code && (
+                      <span className="mr-2 text-xs font-semibold text-slate-500">
+                        OS {String(wo.code).padStart(8, "0")}
+                      </span>
+                    )}
                     {name}{extraServices}
                     {wo.route && (
                       <span className="ml-2 text-slate-500">

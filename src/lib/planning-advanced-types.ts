@@ -48,9 +48,12 @@ export interface CompanySchedule {
   lunchBreakEnd?: string; // "13:00"
 }
 
+export type PlanningBalanceMode = "by_os_count" | "by_hours";
+
 export interface AutoGenerateOptions {
   startDate: string; // ISO date
   endDate: string; // ISO date
   serviceIds?: string[];
   routeIds?: string[];
+  balanceMode: PlanningBalanceMode;
 }

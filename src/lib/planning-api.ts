@@ -22,6 +22,7 @@ interface AutoGeneratePlanningOptions {
   serviceIds?: string[];
   routeIds?: string[];
   companyId?: string;
+  balanceMode: 'by_os_count' | 'by_hours';
 }
 
 /**
@@ -98,10 +99,10 @@ export async function deleteServiceSchedule(
 export async function autoGeneratePlanning(
   options: AutoGeneratePlanningOptions,
   apiContext: ReturnType<typeof useApiContext>
-): Promise<{ created: number; skipped?: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> }> {
+): Promise<{ created: number; skipped?: number; overflow?: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> }> {
   const res = await apiContext.PostAPI('/planning/auto-generate', options, true);
   if (res.status === 200 && res.body) {
-    return res.body as { created: number; skipped?: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> };
+    return res.body as { created: number; skipped?: number; overflow?: number; schedules: Array<{ id: string; type: 'service' | 'route'; scheduledStartAt: string }> };
   }
   throw new Error((res.body as { message?: string })?.message ?? 'Erro ao gerar planejamento automático');
 }

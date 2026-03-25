@@ -1,36 +1,50 @@
 "use client";
 
+import type { WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import type {
+  CompanySchedule,
+  PlanningRoute,
+  PlanningService,
+  ScheduleItem,
+} from "@/lib/planning-advanced-types";
+import { cn } from "@/lib/utils";
+import {
+  allWorkOrdersCompleted,
+  getSummaryVariantForWorkOrders,
+  hasCompletedWithProblems,
+  WORK_ORDER_VARIANT_CLASSES,
+} from "@/lib/work-order-status";
 import {
   DndContext,
   DragOverlay,
   PointerSensor,
   TouchSensor,
-  useSensor,
-  useSensors,
   useDraggable,
   useDroppable,
+  useSensor,
+  useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@/lib/utils";
-import { CalendarPlus, CheckCircle2, Eye, FileText, Plus, Trash2, Route as RouteIcon, Users, Wrench } from "lucide-react";
-import { format, isSameDay, startOfDay, eachDayOfInterval, startOfWeek, endOfWeek } from "date-fns";
+import { eachDayOfInterval, format, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import React, { useCallback, useMemo, useState } from "react";
-import type {
-  ScheduleItem,
-  CompanySchedule,
-  PlanningRoute,
-  PlanningService,
-} from "@/lib/planning-advanced-types";
-import type { WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
 import {
-  getSummaryVariantForWorkOrders,
-  WORK_ORDER_VARIANT_CLASSES,
-  allWorkOrdersCompleted,
-  hasCompletedWithProblems,
-} from "@/lib/work-order-status";
+  CalendarPlus,
+  CheckCircle2,
+  FileText,
+  Plus,
+  Route as RouteIcon,
+  Trash2,
+  Users,
+  Wrench,
+} from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const BRAZIL_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -41,14 +55,31 @@ interface ImprovedWeekViewProps {
   companySchedule: CompanySchedule;
   routes: PlanningRoute[];
   services: PlanningService[];
-  onAddSchedule: (type: "route" | "service", dateKey: string, slotMin: number) => void;
+  onAddSchedule: (
+    type: "route" | "service",
+    dateKey: string,
+    slotMin: number,
+  ) => void;
   onRemoveSchedule: (scheduleId: string) => void;
-  onMoveSchedule: (scheduleId: string, dateKey: string, slotMin: number) => void;
+  onMoveSchedule: (
+    scheduleId: string,
+    dateKey: string,
+    slotMin: number,
+  ) => void;
   onAssignWorkers?: (schedule: ScheduleItem) => void;
   readOnly?: boolean;
   onProgramar?: (schedule: ScheduleItem) => void;
   workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[];
   onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
+  scheduleIdsWithOS?: Set<string>;
+  totalAvailableHoursPerDay?: number;
+  workerRoleCapacity?: Array<{
+    id: string;
+    name: string;
+    workerCount: number;
+    hoursPerDay: number;
+  }>;
+  cipServiceRoleMap?: Map<string, string[]>;
 }
 
 function toBrazilLocal(utcDate: Date) {
@@ -97,27 +128,31 @@ export function ImprovedWeekView({
   onProgramar,
   workOrdersForSchedule,
   onViewWorkOrders,
+  scheduleIdsWithOS,
+  totalAvailableHoursPerDay,
+  workerRoleCapacity,
+  cipServiceRoleMap,
 }: ImprovedWeekViewProps) {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [activeDragData, setActiveDragData] = useState<ScheduleDragData | null>(null);
+  const [activeDragData, setActiveDragData] = useState<ScheduleDragData | null>(
+    null,
+  );
   const [movingScheduleId, setMovingScheduleId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { distance: 8 } })
+    useSensor(TouchSensor, { activationConstraint: { distance: 8 } }),
   );
 
   const workDaysSet = useMemo(
     () => new Set(companySchedule.workDays),
-    [companySchedule.workDays]
+    [companySchedule.workDays],
   );
 
   // Calcular dias da semana
   const weekStart = useMemo(() => {
     const date = new Date(currentDate);
-    const day = date.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    date.setDate(date.getDate() + diff);
+    date.setDate(date.getDate() - date.getDay()); // domingo = 0, volta 0 dias
     date.setHours(0, 0, 0, 0);
     return date;
   }, [currentDate]);
@@ -153,7 +188,9 @@ export function ImprovedWeekView({
       setActiveDragData(null);
 
       if (!over) return;
-      const dayData = over.data?.current as { dateKey: string; slotMin: number } | undefined;
+      const dayData = over.data?.current as
+        | { dateKey: string; slotMin: number }
+        | undefined;
       const cardData = active.data?.current as ScheduleDragData | undefined;
 
       if (
@@ -166,7 +203,7 @@ export function ImprovedWeekView({
         setTimeout(() => setMovingScheduleId(null), 500);
       }
     },
-    [onMoveSchedule]
+    [onMoveSchedule],
   );
 
   const dayColumns = (
@@ -188,6 +225,9 @@ export function ImprovedWeekView({
             onProgramar={onProgramar}
             workOrdersForSchedule={workOrdersForSchedule}
             onViewWorkOrders={onViewWorkOrders}
+            totalAvailableHoursPerDay={totalAvailableHoursPerDay}
+            workerRoleCapacity={workerRoleCapacity}
+            cipServiceRoleMap={cipServiceRoleMap}
           />
         ))}
       </div>
@@ -199,11 +239,15 @@ export function ImprovedWeekView({
       {readOnly ? (
         dayColumns
       ) : (
-        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
           {dayColumns}
           <DragOverlay>
             {activeDragId && activeDragData ? (
-              <div className="rounded border-2 border-primary bg-primary/20 px-3 py-2 text-sm font-medium text-slate-900 shadow-lg cursor-grabbing">
+              <div className="border-primary bg-primary/20 cursor-grabbing rounded border-2 px-3 py-2 text-sm font-medium text-slate-900 shadow-lg">
                 Movendo...
               </div>
             ) : null}
@@ -228,20 +272,39 @@ function DayColumn({
   onProgramar,
   workOrdersForSchedule,
   onViewWorkOrders,
+  totalAvailableHoursPerDay,
+  workerRoleCapacity,
+  cipServiceRoleMap,
 }: {
   day: Date;
   schedules: ScheduleItem[];
   isWorkDay: boolean;
   companySchedule: CompanySchedule;
-  onAddSchedule: (type: "route" | "service", dateKey: string, slotMin: number) => void;
+  onAddSchedule: (
+    type: "route" | "service",
+    dateKey: string,
+    slotMin: number,
+  ) => void;
   onRemoveSchedule: (scheduleId: string) => void;
-  onMoveSchedule: (scheduleId: string, dateKey: string, slotMin: number) => void;
+  onMoveSchedule: (
+    scheduleId: string,
+    dateKey: string,
+    slotMin: number,
+  ) => void;
   onAssignWorkers?: (schedule: ScheduleItem) => void;
   movingScheduleId: string | null;
   readOnly?: boolean;
   onProgramar?: (schedule: ScheduleItem) => void;
   workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[];
   onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
+  totalAvailableHoursPerDay?: number;
+  workerRoleCapacity?: Array<{
+    id: string;
+    name: string;
+    workerCount: number;
+    hoursPerDay: number;
+  }>;
+  cipServiceRoleMap?: Map<string, string[]>;
 }) {
   const dateKey = dateToKey(day);
   const isToday = isSameDay(day, new Date());
@@ -264,46 +327,183 @@ function DayColumn({
     <div
       ref={readOnly ? undefined : droppable.setNodeRef}
       className={cn(
-        "min-w-[280px] flex-shrink-0 flex flex-col rounded-lg border bg-white md:min-w-0",
+        "flex min-w-[280px] flex-shrink-0 flex-col rounded-lg border bg-white md:min-w-0",
         isToday && "border-primary bg-primary/5",
         !isToday && isWorkDay && "border-slate-200",
         !isWorkDay && "border-slate-100 bg-slate-50",
-        !readOnly && droppable.isOver && isWorkDay && "ring-2 ring-primary/50"
+        !readOnly && droppable.isOver && isWorkDay && "ring-primary/50 ring-2",
       )}
     >
       {/* Cabeçalho do dia */}
       <div
         className={cn(
           "border-b p-3",
-          isToday ? "border-primary/20 bg-primary/5" : "border-slate-200"
+          isToday ? "border-primary/20 bg-primary/5" : "border-slate-200",
         )}
       >
-        <div
-          className={cn(
-            "text-sm font-semibold",
-            isToday ? "text-primary" : "text-slate-700"
-          )}
-        >
-          {format(day, "EEE, d", { locale: ptBR })}
-        </div>
-        {isWorkDay && (
-          <div className="mt-1 text-xs text-slate-500">
-            {sortedSchedules.length} agendamento(s)
-          </div>
-        )}
+        {(() => {
+          const hasCapacity =
+            isWorkDay &&
+            totalAvailableHoursPerDay != null &&
+            totalAvailableHoursPerDay > 0;
+          const scheduledMin = hasCapacity
+            ? sortedSchedules.reduce((sum, s) => sum + (s.duration ?? 0), 0)
+            : 0;
+          const scheduledH = scheduledMin / 60;
+          const ratio = hasCapacity
+            ? scheduledH / totalAvailableHoursPerDay!
+            : 0;
+          const pct = Math.round(ratio * 100);
+          const dotColor = !hasCapacity
+            ? "bg-slate-300"
+            : ratio >= 0.9
+              ? "bg-red-500"
+              : ratio >= 0.5
+                ? "bg-amber-500"
+                : "bg-green-500";
+
+          return (
+            <div className="flex items-center justify-between">
+              <div
+                className={cn(
+                  "text-sm font-semibold",
+                  isToday ? "text-primary" : "text-slate-700",
+                )}
+              >
+                {format(day, "EEE, d", { locale: ptBR })}
+              </div>
+              <div className="flex items-center gap-1.5">
+                {isWorkDay && sortedSchedules.length > 0 && (
+                  <span className="text-[10px] text-slate-400">
+                    {sortedSchedules.length} agend.
+                  </span>
+                )}
+                {hasCapacity && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 rounded px-1 py-0.5 transition-colors hover:bg-slate-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span
+                          className={cn(
+                            "h-2 w-2 shrink-0 rounded-full",
+                            dotColor,
+                          )}
+                        />
+                        <span className="text-[10px] text-slate-500 tabular-nums">
+                          {pct}%
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-56 p-3 text-xs">
+                      <p className="mb-2 font-semibold text-slate-900">
+                        Capacidade do dia
+                      </p>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-slate-600">Planejado</span>
+                        <span className="font-medium text-slate-900">
+                          {scheduledH.toFixed(1)}h
+                        </span>
+                      </div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-slate-600">Disponível</span>
+                        <span className="font-medium text-slate-900">
+                          {totalAvailableHoursPerDay!.toFixed(1)}h
+                        </span>
+                      </div>
+                      <div className="mb-3 h-1.5 w-full rounded-full bg-slate-200">
+                        <div
+                          className={cn("h-1.5 rounded-full", dotColor)}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      {workerRoleCapacity &&
+                        workerRoleCapacity.length > 0 &&
+                        (() => {
+                          // Calcular horas planejadas por role
+                          const plannedByRole = new Map<string, number>();
+                          if (cipServiceRoleMap) {
+                            for (const s of sortedSchedules) {
+                              const serviceId =
+                                s.type === "service" ? s.serviceId : undefined;
+                              if (!serviceId) continue;
+                              const roleIds =
+                                cipServiceRoleMap.get(serviceId) ?? [];
+                              const dur = (s.duration ?? 0) / 60;
+                              for (const rid of roleIds) {
+                                plannedByRole.set(
+                                  rid,
+                                  (plannedByRole.get(rid) ?? 0) + dur,
+                                );
+                              }
+                            }
+                          }
+
+                          return (
+                            <>
+                              <p className="mb-1.5 font-semibold text-slate-900">
+                                Por função
+                              </p>
+                              <div className="grid grid-cols-[1fr_auto_auto] gap-x-2 gap-y-1 text-[11px]">
+                                <span className="font-medium text-slate-400">
+                                  Função
+                                </span>
+                                <span className="text-right font-medium text-slate-400">
+                                  Disp.
+                                </span>
+                                <span className="text-right font-medium text-slate-400">
+                                  Plan.
+                                </span>
+                                {workerRoleCapacity.map((role) => {
+                                  const planned =
+                                    plannedByRole.get(role.id) ?? 0;
+                                  return (
+                                    <React.Fragment key={role.id}>
+                                      <span className="truncate text-slate-600">
+                                        {role.name} ({role.workerCount}x)
+                                      </span>
+                                      <span className="shrink-0 text-right text-slate-900 tabular-nums">
+                                        ~{role.hoursPerDay.toFixed(1)}h
+                                      </span>
+                                      <span
+                                        className={cn(
+                                          "shrink-0 text-right font-medium tabular-nums",
+                                          planned > 0
+                                            ? "text-primary"
+                                            : "text-slate-400",
+                                        )}
+                                      >
+                                        {planned.toFixed(1)}h
+                                      </span>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          );
+                        })()}
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Lista de agendamentos */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col space-y-2 overflow-y-auto p-2">
         {!isWorkDay ? (
-          <p className="text-xs text-slate-400 text-center py-4">
+          <p className="py-4 text-center text-xs text-slate-400">
             Não é dia útil
           </p>
         ) : (
           <>
             {sortedSchedules.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center flex-1">
-                <p className="text-xs text-slate-400 mb-2">
+              <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
+                <p className="mb-2 text-xs text-slate-400">
                   Nenhum agendamento
                 </p>
               </div>
@@ -358,7 +558,12 @@ function DayColumn({
                     displayName={displayName}
                     isRoute={isRoute}
                     onRemove={() => onRemoveSchedule(schedule.id)}
-                    onAssignWorkers={onAssignWorkers ? () => onAssignWorkers(schedule) : undefined}
+                    onAssignWorkers={
+                      onAssignWorkers
+                        ? () => onAssignWorkers(schedule)
+                        : undefined
+                    }
+                    workOrders={workOrdersForSchedule?.(schedule) ?? []}
                   />
                 );
               })
@@ -367,10 +572,12 @@ function DayColumn({
               <button
                 type="button"
                 onClick={() => {
-                  const startMin = parseTimeToMinutes(companySchedule.businessHoursStart);
+                  const startMin = parseTimeToMinutes(
+                    companySchedule.businessHoursStart,
+                  );
                   onAddSchedule("route", dateKey, startMin);
                 }}
-                className="mt-2 shrink-0 flex items-center justify-center gap-1 rounded border border-dashed border-slate-300 py-2 px-3 text-xs font-medium text-slate-600 hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
+                className="hover:border-primary hover:bg-primary/5 hover:text-primary mt-2 flex shrink-0 items-center justify-center gap-1 rounded border border-dashed border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Adicionar agendamento
@@ -405,73 +612,176 @@ function ReadOnlyScheduleCard({
   workOrders?: WorkOrderSummary[];
   onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
 }) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-2.5 transition-all",
-        "border-primary/40 bg-primary/10"
-      )}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2 min-w-0 flex-1">
-          {isRoute ? (
-            <RouteIcon className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
-          ) : (
-            <Wrench className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
-          )}
+  const hasWO = workOrders.length > 0;
+
+  if (hasWO) {
+    const allCompleted = allWorkOrdersCompleted(workOrders);
+    const withProblems = allCompleted && hasCompletedWithProblems(workOrders);
+    const variant = allCompleted
+      ? "success"
+      : (getSummaryVariantForWorkOrders(workOrders) ?? "warning");
+    const classes = WORK_ORDER_VARIANT_CLASSES[variant];
+    const statusLabel = allCompleted
+      ? withProblems
+        ? "* Concluída"
+        : "Concluída"
+      : "Pendente";
+    const woCode = workOrders[0]?.code
+      ? String(workOrders[0].code).padStart(8, "0")
+      : null;
+
+    return (
+      <div
+        className={cn("rounded-lg border p-2.5", classes.border, classes.bg)}
+      >
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-slate-900 truncate">{displayName}</p>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <p className="text-xs font-bold text-slate-900">
+              {woCode ? `OS ${woCode}` : "OS emitida"}
+            </p>
+            <p className="mt-0.5 truncate text-[10px] text-slate-600">
+              {displayName}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
               <span>{timeStr}</span>
               <span>•</span>
               <span>{formatDuration(schedule.duration)}</span>
-              {workOrders.length > 0 && (() => {
-                const allCompleted = allWorkOrdersCompleted(workOrders);
-                const withProblems = allCompleted && hasCompletedWithProblems(workOrders);
-                const variant = allCompleted ? "success" : (getSummaryVariantForWorkOrders(workOrders) ?? "warning");
-                const classes = WORK_ORDER_VARIANT_CLASSES[variant];
-                const badgeLabel = allCompleted ? (withProblems ? "* Concluída" : "Concluída") : "Emitida";
-                const badgeTitle = allCompleted
-                  ? (withProblems ? "Concluída com problema(s) relatado(s)" : "Ordem(ns) de serviço concluída(s)")
-                  : "Ordem(ns) de serviço";
-                return (
-                  <span
-                    className={cn("inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium", classes.bg, classes.text, classes.border)}
-                    title={badgeTitle}
-                  >
-                    <CheckCircle2 className="h-2.5 w-2.5" />
-                    {badgeLabel}
-                  </span>
-                );
-              })()}
+              <span>•</span>
+              <span className={cn("font-medium", classes.text)}>
+                {statusLabel}
+              </span>
             </div>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {onViewWorkOrders && workOrders.length > 0 && (
+          {onViewWorkOrders && (
             <button
               type="button"
               onClick={() => onViewWorkOrders(workOrders)}
               title="Ver ordens de serviço"
-              className="rounded border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
+              className="shrink-0 rounded border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
             >
               <FileText className="h-3.5 w-3.5" />
             </button>
           )}
-          {onProgramar && workOrders.length === 0 && (
-            <button
-              type="button"
-              onClick={() => onProgramar(schedule)}
-              title="Programar"
-              className="rounded border border-primary bg-white p-1.5 text-primary hover:bg-primary/5"
-            >
-              <CalendarPlus className="h-3.5 w-3.5" />
-            </button>
-          )}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-primary/40 bg-primary/10 rounded-lg border p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          {isRoute ? (
+            <RouteIcon className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <Wrench className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-slate-900">
+              {displayName}
+            </p>
+            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              <span>{timeStr}</span>
+              <span>•</span>
+              <span>{formatDuration(schedule.duration)}</span>
+              {workOrders.length > 0 &&
+                (() => {
+                  const variant =
+                    getSummaryVariantForWorkOrders(workOrders) ?? "warning";
+                  const classes = WORK_ORDER_VARIANT_CLASSES[variant];
+                  return (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium",
+                        classes.bg,
+                        classes.text,
+                        classes.border,
+                      )}
+                      title="Ordem(ns) de serviço"
+                    >
+                      <CheckCircle2 className="h-2.5 w-2.5" />
+                      Emitida
+                    </span>
+                  );
+                })()}
+            </div>
+          </div>
+        </div>
+        {onProgramar && (
+          <button
+            type="button"
+            onClick={() => onProgramar(schedule)}
+            title="Programar"
+            className="border-primary text-primary hover:bg-primary/5 shrink-0 rounded border bg-white p-1.5"
+          >
+            <CalendarPlus className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
+}
+
+type ScheduleCardVariant =
+  | "overdue"
+  | "pending"
+  | "wo_pending"
+  | "wo_completed";
+
+const SCHEDULE_CARD_STYLES: Record<
+  ScheduleCardVariant,
+  {
+    border: string;
+    bg: string;
+    badgeBorder: string;
+    badgeBg: string;
+    badgeText: string;
+  }
+> = {
+  overdue: {
+    border: "border-red-300",
+    bg: "bg-red-50",
+    badgeBorder: "border-red-200",
+    badgeBg: "bg-red-100",
+    badgeText: "text-red-800",
+  },
+  pending: {
+    border: "border-primary/40",
+    bg: "bg-primary/10",
+    badgeBorder: "",
+    badgeBg: "",
+    badgeText: "",
+  },
+  wo_pending: {
+    border: "border-amber-300",
+    bg: "bg-amber-50",
+    badgeBorder: "border-amber-200",
+    badgeBg: "bg-amber-100",
+    badgeText: "text-amber-800",
+  },
+  wo_completed: {
+    border: "border-green-300",
+    bg: "bg-green-50",
+    badgeBorder: "border-green-200",
+    badgeBg: "bg-green-100",
+    badgeText: "text-green-800",
+  },
+};
+
+function getScheduleCardVariant(
+  schedule: ScheduleItem,
+  workOrders: WorkOrderSummary[],
+): ScheduleCardVariant {
+  const now = new Date();
+  const scheduledAt = new Date(schedule.scheduledStartAt);
+  const isOverdue = scheduledAt < now;
+  const hasWO = workOrders.length > 0;
+  const allCompleted = hasWO && allWorkOrdersCompleted(workOrders);
+
+  if (isOverdue && !(hasWO && allCompleted)) return "overdue";
+  if (!hasWO) return "pending";
+  if (allCompleted) return "wo_completed";
+  return "wo_pending";
 }
 
 function DraggableScheduleCard({
@@ -484,6 +794,7 @@ function DraggableScheduleCard({
   isRoute,
   onRemove,
   onAssignWorkers,
+  workOrders = [],
 }: {
   id: string;
   data: ScheduleDragData;
@@ -494,39 +805,83 @@ function DraggableScheduleCard({
   isRoute: boolean;
   onRemove: () => void;
   onAssignWorkers?: () => void;
+  workOrders?: WorkOrderSummary[];
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id,
-    data,
-  });
-  const cssTransform = transform ? CSS.Translate.toString(transform) : undefined;
+  const hasWO = workOrders.length > 0;
+  const variant = getScheduleCardVariant(schedule, workOrders);
+  const styles = SCHEDULE_CARD_STYLES[variant];
+  const locked = hasWO;
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id,
+      data,
+      disabled: locked,
+    });
+  const cssTransform = transform
+    ? CSS.Translate.toString(transform)
+    : undefined;
 
   return (
     <div
       ref={setNodeRef}
       style={{ transform: cssTransform }}
       className={cn(
-        "group cursor-grab rounded-lg border p-2.5 transition-all hover:shadow-md active:cursor-grabbing",
-        isRoute
-          ? "border-primary/40 bg-primary/10"
-          : "border-primary/40 bg-primary/10",
-        isDragging && "opacity-50 z-10",
-        isMoving && "opacity-60"
+        "group rounded-lg border p-2.5 transition-all",
+        styles.border,
+        styles.bg,
+        locked
+          ? "cursor-default"
+          : "cursor-grab hover:shadow-md active:cursor-grabbing",
+        isDragging && "z-10 opacity-50",
+        isMoving && "opacity-60",
       )}
-      {...listeners}
-      {...attributes}
+      {...(locked ? {} : listeners)}
+      {...(locked ? {} : attributes)}
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2 min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
           {isRoute ? (
-            <RouteIcon className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+            <RouteIcon className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
           ) : (
-            <Wrench className="h-3.5 w-3.5 shrink-0 text-primary mt-0.5" />
+            <Wrench className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-slate-900 truncate">
-              {displayName}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="truncate text-xs font-medium text-slate-900">
+                {displayName}
+              </p>
+              {hasWO &&
+                (() => {
+                  const woCode = workOrders[0]?.code
+                    ? String(workOrders[0].code).padStart(8, "0")
+                    : null;
+                  return (
+                    <span
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium",
+                        styles.badgeBorder,
+                        styles.badgeBg,
+                        styles.badgeText,
+                      )}
+                    >
+                      <CheckCircle2 className="h-2.5 w-2.5" />
+                      {woCode ? `OS ${woCode}` : "OS"}
+                    </span>
+                  );
+                })()}
+              {variant === "overdue" && !hasWO && (
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium",
+                    styles.badgeBorder,
+                    styles.badgeBg,
+                    styles.badgeText,
+                  )}
+                >
+                  Atrasado
+                </span>
+              )}
+            </div>
             <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
               <span>{timeStr}</span>
               <span>•</span>
@@ -539,34 +894,36 @@ function DraggableScheduleCard({
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          {onAssignWorkers && (
+        {!locked && (
+          <div className="flex shrink-0 items-center gap-0.5">
+            {onAssignWorkers && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onAssignWorkers();
+                }}
+                className="hover:text-primary rounded p-1 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-100"
+                title="Atribuir colaboradores"
+              >
+                <Users className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onAssignWorkers();
+                onRemove();
               }}
-              className="rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-primary group-hover:opacity-100"
-              title="Atribuir colaboradores"
+              className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
+              title="Remover"
             >
-              <Users className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRemove();
-            }}
-            className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-600 group-hover:opacity-100"
-            title="Remover"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

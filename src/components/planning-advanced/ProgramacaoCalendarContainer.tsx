@@ -8,12 +8,14 @@ import { ConfirmProgramacaoModal } from "@/components/planning-advanced/ConfirmP
 import { ImprovedWeekView } from "@/components/planning-advanced/ImprovedWeekView";
 import { ViewWorkOrdersModal, type WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
 import { PlanningToolbar, type PlanningView } from "@/components/planning-advanced/PlanningToolbar";
+import { PlanningRoutesFiltersPanel } from "@/components/planning-routes/PlanningRoutesFiltersPanel";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
 import { combineSchedules, fetchSchedules, fetchWorkload } from "@/lib/planning-api";
 import type { ScheduleItem } from "@/lib/planning-advanced-types";
 import type {
   CompanySchedule,
+  FilterServicesPayload,
   Route,
   RouteCipServiceItem,
   RouteScheduleItem,
@@ -21,7 +23,7 @@ import type {
   WorkloadIndicator,
 } from "@/lib/route-types";
 import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -74,6 +76,10 @@ export function ProgramacaoCalendarContainer() {
   const [emitting, setEmitting] = useState(false);
   const [workOrders, setWorkOrders] = useState<WorkOrderSummary[]>([]);
   const [selectedWorkOrdersToView, setSelectedWorkOrdersToView] = useState<WorkOrderSummary[] | null>(null);
+  const [filters, setFilters] = useState<FilterServicesPayload>({});
+  const [filteredCipServiceIds, setFilteredCipServiceIds] = useState<Set<string> | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [workers, setWorkers] = useState<Array<{ id: string; name: string; workerRoles?: Array<{ id: string; name: string }> }>>([]);
 
   const schedules = useMemo(
     () => combineSchedules(routeSchedules, serviceSchedules),
@@ -94,13 +100,14 @@ export function ProgramacaoCalendarContainer() {
     }
     setLoading(true);
     try {
-      const [schedulesResult, companyRes, routesRes, servicesRes, routeServicesRes, workOrdersRes] = await Promise.all([
+      const [schedulesResult, companyRes, routesRes, servicesRes, routeServicesRes, workOrdersRes, workersRes] = await Promise.all([
         fetchSchedules(effectiveCompanyId, apiContext),
         apiContext.GetAPI(`/company/${effectiveCompanyId}`, true),
         apiContext.GetAPI(isSuperAdmin ? `/route?companyId=${effectiveCompanyId}` : "/route", true),
         apiContext.PostAPI(`/filter-services`, { companyId: effectiveCompanyId }, true),
         apiContext.GetAPI(`/route/company/${effectiveCompanyId}/route-services`, true),
         apiContext.GetAPI(`/work-order/company/${effectiveCompanyId}`, true),
+        apiContext.GetAPI(isSuperAdmin ? `/workers?companyId=${effectiveCompanyId}` : "/workers", true),
       ]);
       setRouteSchedules(schedulesResult.routeSchedules);
       setServiceSchedules(schedulesResult.serviceSchedules);
@@ -118,6 +125,9 @@ export function ProgramacaoCalendarContainer() {
       }
       if (workOrdersRes.status === 200 && workOrdersRes.body?.workOrders) {
         setWorkOrders(workOrdersRes.body.workOrders as WorkOrderSummary[]);
+      }
+      if (workersRes.status === 200 && workersRes.body?.workers) {
+        setWorkers(workersRes.body.workers as Array<{ id: string; name: string; workerRoles?: Array<{ id: string; name: string }> }>);
       }
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
@@ -287,29 +297,102 @@ export function ProgramacaoCalendarContainer() {
         };
       } else {
         const service = services.find((s) => s.id === schedule.cipServiceId);
+        const cip = service ?? schedule.cipService;
         return {
           id: schedule.id,
           type: "service" as const,
           serviceId: schedule.cipServiceId,
           scheduledStartAt: schedule.scheduledStartAt,
-          duration: schedule.cipService?.executionTime?.minutes || 60,
+          duration: cip?.executionTime?.minutes || 60,
           ...base,
-          service: service
+          service: cip
             ? {
-                id: service.id,
-                name: service.serviceModel?.name || "Serviço",
+                id: cip.id ?? schedule.cipServiceId,
+                name: cip.serviceModel?.name || "Serviço",
                 equipmentName:
-                  service.cip?.subset?.set?.equipment?.name ||
-                  service.cip?.subset?.set?.equipment?.tag ||
+                  cip.cip?.subset?.set?.equipment?.name ||
+                  cip.cip?.subset?.set?.equipment?.tag ||
                   "Equipamento",
-                duration: service.executionTime?.minutes || 60,
-                periodDays: service.period?.days || undefined,
+                duration: cip.executionTime?.minutes || 60,
+                periodDays: cip.period?.days || undefined,
               }
             : undefined,
         };
       }
     });
   }, [schedules, routes, services]);
+
+  const activeFiltersCount = useMemo(() => {
+    const keys: (keyof FilterServicesPayload)[] = [
+      "periodIds", "priorityIds", "teamIds", "serviceConditionIds",
+      "jobSystemIds", "executionTimeIds", "extraTeamIds",
+      "estimatedExtraTeamTimeIds", "serviceModelIds", "epiIds",
+      "toolkitIds", "sectorIds", "equipmentTypeIds", "manufacturerIds",
+      "costCenterIds", "safetyConditionIds", "lubricationSystemIds",
+      "mainComponentIds", "powerUnitIds",
+    ];
+    return keys.filter((k) => (filters[k] as string[] | undefined)?.length).length;
+  }, [filters]);
+
+  const handleApplyFilters = useCallback(async (newFilters: FilterServicesPayload) => {
+    console.log("[filters] handleApplyFilters called with:", newFilters);
+    setFilters(newFilters);
+    const hasActive = Object.values(newFilters).some(v => Array.isArray(v) && v.length > 0);
+    if (!hasActive || !effectiveCompanyId) {
+      console.log("[filters] clearing filteredCipServiceIds (no active filters)");
+      setFilteredCipServiceIds(null);
+      return;
+    }
+    try {
+      const allIds: string[] = [];
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const res = await apiContext.PostAPI("/filter-services", {
+          ...newFilters,
+          companyId: effectiveCompanyId,
+          limit: 100,
+          page,
+        }, true);
+        console.log("[filters] page", page, "status:", res.status, "count:", (res.body?.cipServices as unknown[])?.length ?? 0, "total:", res.body?.total);
+        if (res.status === 200 && res.body?.cipServices) {
+          const batch = (res.body.cipServices as Array<{ id: string }>).map(s => s.id);
+          allIds.push(...batch);
+          const total = typeof res.body.total === "number" ? res.body.total : 0;
+          hasMore = allIds.length < total;
+          page += 1;
+        } else {
+          hasMore = false;
+        }
+      }
+      console.log("[filters] total matched cipService IDs:", allIds.length);
+      setFilteredCipServiceIds(new Set(allIds));
+    } catch (err) {
+      console.error("[filters] error calling /filter-services:", err);
+      setFilteredCipServiceIds(null);
+    }
+  }, [effectiveCompanyId, apiContext]);
+
+  const filteredScheduleItems = useMemo(() => {
+    console.log("[filters] computing filteredScheduleItems. filteredCipServiceIds:", filteredCipServiceIds ? `Set(${filteredCipServiceIds.size})` : "null", "scheduleItems:", scheduleItems.length, "routeCipServices:", routeCipServices.length);
+    if (!filteredCipServiceIds) return scheduleItems;
+    const result = scheduleItems.filter(item => {
+      if (item.type === "service" && item.serviceId) {
+        const match = filteredCipServiceIds.has(item.serviceId);
+        if (!match) console.log("[filters] excluding service schedule", item.id, "serviceId:", item.serviceId);
+        return match;
+      }
+      if (item.type === "route" && item.routeId) {
+        const rcsForRoute = routeCipServices.filter(rcs => rcs.routeId === item.routeId);
+        const match = rcsForRoute.some(rcs => filteredCipServiceIds.has(rcs.cipServiceId));
+        console.log("[filters] route", item.routeId, "has", rcsForRoute.length, "cipServices, match:", match, "cipServiceIds:", rcsForRoute.map(r => r.cipServiceId));
+        return match;
+      }
+      return true;
+    });
+    console.log("[filters] filtered result:", result.length, "of", scheduleItems.length);
+    return result;
+  }, [scheduleItems, filteredCipServiceIds, routeCipServices]);
 
   const handleProgramar = useCallback((schedule: ScheduleItem) => {
     setScheduleToConfirm(schedule);
@@ -493,6 +576,69 @@ export function ProgramacaoCalendarContainer() {
     [workOrdersByScheduleId]
   );
 
+  const { workerRoleCapacity, totalAvailableHoursPerDay } = useMemo(() => {
+    if (!companySchedule) return { workerRoleCapacity: [], totalAvailableHoursPerDay: 0 };
+    const cs = companySchedule;
+    const toMin = (hhmm: string | null) => {
+      if (!hhmm) return 0;
+      const [h, m] = hhmm.split(":").map(Number);
+      return (Number.isNaN(h) ? 0 : h) * 60 + (Number.isNaN(m) ? 0 : m);
+    };
+    const startMin = toMin(cs.businessHoursStart);
+    const endMin = toMin(cs.businessHoursEnd);
+    let lunchMin = 0;
+    if (cs.lunchBreakStart && cs.lunchBreakEnd) {
+      lunchMin = toMin(cs.lunchBreakEnd) - toMin(cs.lunchBreakStart);
+      if (lunchMin < 0) lunchMin = 0;
+    }
+    const hoursPerWorkerPerDay = Math.max(0, (endMin - startMin - lunchMin) / 60);
+
+    const total = Math.round(workers.length * hoursPerWorkerPerDay * 100) / 100;
+
+    const roleMap = new Map<string, { name: string; workerCount: number; hours: number }>();
+    for (const w of workers) {
+      const roles = w.workerRoles ?? [];
+      if (roles.length === 0) {
+        const key = "__sem_funcao__";
+        const entry = roleMap.get(key) ?? { name: "Sem função", workerCount: 0, hours: 0 };
+        entry.workerCount += 1;
+        entry.hours += hoursPerWorkerPerDay;
+        roleMap.set(key, entry);
+      } else {
+        const hoursPerRole = hoursPerWorkerPerDay / roles.length;
+        for (const role of roles) {
+          const entry = roleMap.get(role.id) ?? { name: role.name, workerCount: 0, hours: 0 };
+          entry.workerCount += 1;
+          entry.hours += hoursPerRole;
+          roleMap.set(role.id, entry);
+        }
+      }
+    }
+
+    const capacity = Array.from(roleMap.entries()).map(([id, { name, workerCount, hours }]) => ({
+      id, name, workerCount,
+      hoursPerDay: Math.round(hours * 100) / 100,
+    }));
+
+    return { workerRoleCapacity: capacity, totalAvailableHoursPerDay: total };
+  }, [workers, companySchedule]);
+
+  const cipServiceRoleMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const ss of serviceSchedules) {
+      const roles = (ss.cipService as { team?: { teamWorkerRoles?: Array<{ workerRole?: { id: string } }> } })
+        ?.team?.teamWorkerRoles?.map(twr => twr.workerRole?.id).filter((id): id is string => !!id) ?? [];
+      if (roles.length > 0) map.set(ss.cipServiceId, roles);
+    }
+    for (const s of services) {
+      if (!map.has(s.id)) {
+        const roles = s.team?.teamWorkerRoles?.map(twr => twr.workerRole?.id).filter((id): id is string => !!id) ?? [];
+        if (roles.length > 0) map.set(s.id, roles);
+      }
+    }
+    return map;
+  }, [serviceSchedules, services]);
+
   const handleViewWorkOrders = useCallback((list: WorkOrderSummary[]) => {
     setSelectedWorkOrdersToView(list);
   }, []);
@@ -531,21 +677,51 @@ export function ProgramacaoCalendarContainer() {
             onNavigate={handleNavigate}
             onViewChange={handleViewChange}
           />
-          <button
-            type="button"
-            onClick={() => setShowBulkModal(true)}
-            className="flex items-center gap-2 rounded border border-primary bg-white px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 sm:px-4 sm:py-2"
-          >
-            <CalendarClock className="h-4 w-4" />
-            Emitir ordens de serviço em lote
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-sm font-medium sm:px-3 ${
+                activeFiltersCount > 0
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtros
+              {activeFiltersCount > 0 && (
+                <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-white">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBulkModal(true)}
+              className="flex items-center gap-2 rounded border border-primary bg-white px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 sm:px-4 sm:py-2"
+            >
+              <CalendarClock className="h-4 w-4" />
+              Emitir ordens de serviço em lote
+            </button>
+          </div>
         </div>
       </div>
+
+      {filtersOpen && (
+        <div className="flex-shrink-0 border-b border-slate-200 bg-slate-50 px-6 py-4">
+          <PlanningRoutesFiltersPanel
+            filters={filters}
+            onApply={handleApplyFilters}
+            onClose={() => setFiltersOpen(false)}
+            compact
+          />
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden">
         {viewMode === "day" ? (
           <AdvancedDayView
-            schedules={scheduleItems}
+            schedules={filteredScheduleItems}
             currentDate={currentDate}
             companySchedule={companyScheduleFormatted}
             routes={planningRoutes}
@@ -557,10 +733,13 @@ export function ProgramacaoCalendarContainer() {
             onMoveSchedule={noop}
             workOrdersForSchedule={workOrdersForSchedule}
             onViewWorkOrders={handleViewWorkOrders}
+            totalAvailableHoursPerDay={totalAvailableHoursPerDay}
+            workerRoleCapacity={workerRoleCapacity}
+            cipServiceRoleMap={cipServiceRoleMap}
           />
         ) : viewMode === "week" ? (
           <ImprovedWeekView
-            schedules={scheduleItems}
+            schedules={filteredScheduleItems}
             currentDate={currentDate}
             companySchedule={companyScheduleFormatted}
             routes={planningRoutes}
@@ -572,6 +751,9 @@ export function ProgramacaoCalendarContainer() {
             onMoveSchedule={noop}
             workOrdersForSchedule={workOrdersForSchedule}
             onViewWorkOrders={handleViewWorkOrders}
+            totalAvailableHoursPerDay={totalAvailableHoursPerDay}
+            workerRoleCapacity={workerRoleCapacity}
+            cipServiceRoleMap={cipServiceRoleMap}
           />
         ) : viewMode === "year" ? (
           <AdvancedAnnualView
@@ -587,8 +769,9 @@ export function ProgramacaoCalendarContainer() {
           <AdvancedMonthlyCalendar
             displayDate={currentDate}
             indicators={workloadIndicators}
-            schedules={scheduleItems}
+            schedules={filteredScheduleItems}
             companySchedule={companyScheduleFormatted}
+            workOrdersForSchedule={workOrdersForSchedule}
             onDateClick={(dateKey) => {
               const [y, m, d] = dateKey.split("-").map(Number);
               const date = new Date(y, m - 1, d);

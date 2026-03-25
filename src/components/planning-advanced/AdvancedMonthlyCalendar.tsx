@@ -1,5 +1,7 @@
 "use client";
 
+import type { WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
+import { allWorkOrdersCompleted } from "@/lib/work-order-status";
 import type { CompanySchedule, ScheduleItem, WorkloadIndicator } from "@/lib/planning-advanced-types";
 import { cn } from "@/lib/utils";
 import {
@@ -30,6 +32,7 @@ interface AdvancedMonthlyCalendarProps {
   onMoveSchedule?: (scheduleId: string, dateKey: string, slotMin: number) => void;
   onRemoveSchedule?: (scheduleId: string) => void;
   onAssignWorkers?: (schedule: ScheduleItem) => void;
+  workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[];
 }
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -38,6 +41,66 @@ const MONTHS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
+/** Cor do card do dia: baseada no status mais crítico dos schedules. */
+type DayScheduleStatus = "empty" | "all_completed" | "has_pending" | "has_overdue";
+
+function getDayScheduleStatus(
+  daySchedules: ScheduleItem[],
+  workOrdersForSchedule?: (schedule: ScheduleItem) => WorkOrderSummary[]
+): DayScheduleStatus {
+  if (daySchedules.length === 0) return "empty";
+  const now = new Date();
+  let hasOverdue = false;
+  let hasPending = false;
+  let allCompleted = true;
+
+  for (const s of daySchedules) {
+    const wos = workOrdersForSchedule?.(s) ?? [];
+    const completed = wos.length > 0 && allWorkOrdersCompleted(wos);
+    if (completed) continue;
+    allCompleted = false;
+    const scheduledAt = new Date(s.scheduledStartAt);
+    if (scheduledAt < now) {
+      hasOverdue = true;
+    } else {
+      hasPending = true;
+    }
+  }
+
+  if (hasOverdue) return "has_overdue";
+  if (hasPending) return "has_pending";
+  if (allCompleted) return "all_completed";
+  return "empty";
+}
+
+function getDayCardColor(status: DayScheduleStatus) {
+  switch (status) {
+    case "has_overdue":    return "border-red-200 bg-red-50/80";
+    case "has_pending":    return "border-amber-200 bg-amber-50/80";
+    case "all_completed":  return "border-green-200 bg-green-50/80";
+    default:               return "border-blue-200 bg-blue-50/80";
+  }
+}
+
+/** Cor do indicador (bolinha): baseada em horas agendadas vs disponíveis. */
+function getCapacityDot(indicator: WorkloadIndicator | null) {
+  if (!indicator || indicator.availableHours === 0) return "bg-blue-500";
+  const ratio = indicator.scheduledHours / indicator.availableHours;
+  if (ratio >= 0.9) return "bg-red-500";
+  if (ratio >= 0.5) return "bg-amber-500";
+  return "bg-green-500";
+}
+
+function getCapacityDotTitle(indicator: WorkloadIndicator | null) {
+  if (!indicator || indicator.availableHours === 0) return "Sem dados de capacidade";
+  const ratio = indicator.scheduledHours / indicator.availableHours;
+  const pct = (ratio * 100).toFixed(0);
+  if (ratio >= 0.9) return `Sobrecarga (${pct}%)`;
+  if (ratio >= 0.5) return `Carga moderada (${pct}%)`;
+  return `Carga adequada (${pct}%)`;
+}
+
+// Mantida para compatibilidade com getStatusColor legado
 function getStatusColor(status: WorkloadIndicator["status"] | null) {
   if (!status) return "border-blue-200 bg-blue-50/80";
   switch (status) {
@@ -197,6 +260,7 @@ export function AdvancedMonthlyCalendar({
   onMoveSchedule,
   onRemoveSchedule,
   onAssignWorkers,
+  workOrdersForSchedule,
 }: AdvancedMonthlyCalendarProps) {
   const year = displayDate.getFullYear();
   const month = displayDate.getMonth() + 1;
@@ -311,10 +375,11 @@ export function AdvancedMonthlyCalendar({
     const dateKey = `${cellYear}-${String(cellMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const indicator = getIndicatorForDay(cellYear, cellMonth, day);
     const hasNoPlanning = !indicator || (indicator.scheduledHours === 0 && indicator.availableHours === 0);
-    const status = hasNoPlanning ? null : indicator!.status;
     const { routeCount, serviceCount } = getScheduleCountsForDay(cellYear, cellMonth, day);
     const daySchedules = schedulesByDate.get(dateKey) ?? [];
     const isTodayDay = isTodayDate(cellYear, cellMonth, day);
+    const dayStatus = getDayScheduleStatus(daySchedules, workOrdersForSchedule);
+    const dayCardColor = daySchedules.length > 0 ? getDayCardColor(dayStatus) : getDayCardColor("empty");
 
     // Dia de outro mês: estilo esmaecido e clique navega para esse mês
     if (!isCurrentMonth) {
@@ -344,8 +409,8 @@ export function AdvancedMonthlyCalendar({
           <span className="font-semibold text-slate-900 text-sm">{day}</span>
           {!hasNoPlanning && (
             <span
-              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", getStatusDot(status))}
-              title={status === "high" ? "Sobrecarga" : status === "medium" ? "Carga moderada" : "Carga adequada"}
+              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", getCapacityDot(indicator))}
+              title={getCapacityDotTitle(indicator)}
             />
           )}
         </div>
@@ -407,7 +472,7 @@ export function AdvancedMonthlyCalendar({
           id={droppableId}
           dateKey={dateKey}
           isToday={isTodayDay}
-          status={status}
+          colorClass={dayCardColor}
           onClick={() => onDateClick?.(dateKey)}
         >
           {cellContent}
@@ -423,7 +488,7 @@ export function AdvancedMonthlyCalendar({
         className={cn(
           "flex min-h-[120px] flex-col rounded-lg border-2 px-2 py-2 text-left transition-all overflow-hidden",
           "hover:shadow-md",
-          getStatusColor(status),
+          dayCardColor,
           isTodayDay && "ring-2 ring-primary ring-offset-2"
         )}
       >
@@ -463,19 +528,32 @@ export function AdvancedMonthlyCalendar({
         <div className="flex flex-wrap items-center gap-4 text-xs">
           <div className="flex items-center gap-2">
             <span className="inline-block h-4 w-4 rounded border border-blue-200 bg-blue-50" />
-            <span className="text-slate-600">Período vazio</span>
+            <span className="text-slate-600">Sem agendamento</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-4 w-4 rounded border border-amber-200 bg-amber-50" />
+            <span className="text-slate-600">Pendente</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-block h-4 w-4 rounded border border-green-200 bg-green-50" />
-            <span className="text-slate-600">Carga adequada (&lt; 80%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-4 w-4 rounded border border-yellow-200 bg-yellow-50" />
-            <span className="text-slate-600">Carga moderada (80–95%)</span>
+            <span className="text-slate-600">Concluído</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="inline-block h-4 w-4 rounded border border-red-200 bg-red-50" />
-            <span className="text-slate-600">Sobrecarga (&gt; 95%)</span>
+            <span className="text-slate-600">Atrasado</span>
+          </div>
+          <span className="text-slate-300">|</span>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+            <span className="text-slate-600">&lt; 50%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+            <span className="text-slate-600">50–90%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+            <span className="text-slate-600">&ge; 90%</span>
           </div>
         </div>
       </div>
@@ -550,14 +628,14 @@ function MonthDayDroppable({
   id,
   dateKey,
   isToday,
-  status,
+  colorClass,
   onClick,
   children,
 }: {
   id: string;
   dateKey: string;
   isToday: boolean;
-  status: WorkloadIndicator["status"] | null;
+  colorClass: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -573,7 +651,7 @@ function MonthDayDroppable({
       className={cn(
         "flex min-h-[120px] flex-col rounded-lg border-2 px-1 py-1 text-left transition-all overflow-hidden",
         "hover:shadow-md cursor-pointer",
-        getStatusColor(status),
+        colorClass,
         isToday && "ring-2 ring-primary ring-offset-2",
         isOver && "ring-2 ring-primary ring-offset-2 bg-primary/5"
       )}
