@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
-import { CookiesProvider } from "next-client-cookies/server";
 import { ContextProviders } from "@/context/ContextProviders";
+import type { Metadata } from "next";
+import { CookiesProvider } from "next-client-cookies/server";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -11,8 +11,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Inova ADM",
-  description: "Sistema de Gestão Inova",
+  title: "TechLub ADM",
+  description: "Sistema de Gestão TechLub",
 };
 
 export default function RootLayout({

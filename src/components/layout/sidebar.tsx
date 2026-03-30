@@ -17,7 +17,7 @@ import {
   LogOut,
   Menu,
   Route,
-  Wrench
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -26,7 +26,12 @@ import { useRef, useState } from "react";
 const menuItems = [
   { icon: Wrench, label: "Equipamentos", href: "/equipamentos", enabled: true },
   { icon: Route, label: "Planejamento", href: "/planejamento", enabled: true },
-  { icon: CalendarDays, label: "Programação", href: "/programacao", enabled: true },
+  {
+    icon: CalendarDays,
+    label: "Programação",
+    href: "/programacao",
+    enabled: true,
+  },
   { icon: BookOpen, label: "Tutoriais", href: "/tutoriais", enabled: true },
 ];
 
@@ -56,7 +61,7 @@ export function Sidebar() {
       <div className="flex h-16 items-center justify-between border-b border-slate-100 px-4">
         {!isCollapsed && (
           <span className="text-primary text-xl font-bold tracking-tight">
-            Inova<span className="font-medium text-slate-700">ADM</span>
+            TechLub<span className="font-medium text-slate-700">ADM</span>
           </span>
         )}
         <button
@@ -114,10 +119,7 @@ export function Sidebar() {
                       {item.enabled ? (
                         <Link
                           href={item.href}
-                          className={cn(
-                            enabledLinkClass,
-                            "justify-center p-3",
-                          )}
+                          className={cn(enabledLinkClass, "justify-center p-3")}
                         >
                           <item.icon
                             className={cn(
@@ -152,22 +154,20 @@ export function Sidebar() {
                       )}
                     </TooltipContent>
                   </Tooltip>
+                ) : item.enabled ? (
+                  <Link
+                    href={item.href}
+                    className={cn(enabledLinkClass, "gap-3 px-4 py-3")}
+                  >
+                    {content}
+                  </Link>
                 ) : (
-                  item.enabled ? (
-                    <Link
-                      href={item.href}
-                      className={cn(enabledLinkClass, "gap-3 px-4 py-3")}
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <span
-                      className={cn(disabledLinkClass, "gap-3 px-4 py-3")}
-                      aria-disabled="true"
-                    >
-                      {content}
-                    </span>
-                  )
+                  <span
+                    className={cn(disabledLinkClass, "gap-3 px-4 py-3")}
+                    aria-disabled="true"
+                  >
+                    {content}
+                  </span>
                 )}
               </div>
             );
@@ -199,11 +199,9 @@ export function Sidebar() {
           {!isCollapsed && (
             <div className="min-w-0 flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium text-slate-900">
-                {loading ? "Carregando..." : profile?.name ?? "Admin"}
+                {loading ? "Carregando..." : (profile?.name ?? "Admin")}
               </p>
-              <p className="truncate text-xs text-slate-500">
-                {roleLabel}
-              </p>
+              <p className="truncate text-xs text-slate-500">{roleLabel}</p>
             </div>
           )}
 
@@ -215,13 +213,13 @@ export function Sidebar() {
                 onClick={() => setUserMenuOpen(false)}
               />
               <div
-                className="absolute bottom-full left-0 right-0 z-50 mb-2 min-w-[120px] rounded-lg border border-slate-200 bg-white py-1 shadow-md"
+                className="absolute right-0 bottom-full left-0 z-50 mb-2 min-w-[120px] rounded-lg border border-slate-200 bg-white py-1 shadow-md"
                 role="menu"
               >
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="hover:bg-slate-50 flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   role="menuitem"
                 >
                   <LogOut className="h-4 w-4 text-slate-500" />

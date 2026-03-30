@@ -1,12 +1,12 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
-import { Input } from "@/components/ui/input";
-import { BookOpen, FileVideo, FileText, Loader2, Plus, X } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { BookOpen, FileText, FileVideo, Loader2, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import * as Dialog from "@radix-ui/react-dialog";
 
 interface Tutorial {
   id: string;
@@ -148,7 +148,8 @@ export default function TutoriaisPage() {
             Tutoriais
           </h1>
           <p className="text-slate-500">
-            Conteúdos da Universidade Inova (vídeos e arquivos) para os colaboradores
+            Conteúdos da Universidade TechLub (vídeos e arquivos) para os
+            colaboradores
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -159,7 +160,7 @@ export default function TutoriaisPage() {
             type="button"
             onClick={handleOpenModal}
             disabled={!canCreate}
-            className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             Novo tutorial
@@ -180,21 +181,28 @@ export default function TutoriaisPage() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50/80">
               <tr>
                 <th className="px-4 py-3 font-medium text-slate-700">Nome</th>
-                <th className="px-4 py-3 font-medium text-slate-700">Descrição</th>
+                <th className="px-4 py-3 font-medium text-slate-700">
+                  Descrição
+                </th>
                 <th className="px-4 py-3 font-medium text-slate-700">Tipo</th>
                 <th className="px-4 py-3 font-medium text-slate-700">Data</th>
               </tr>
             </thead>
             <tbody>
               {tutorials.map((t) => (
-                <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
-                  <td className="px-4 py-3 text-slate-600 max-w-xs truncate">
+                <tr
+                  key={t.id}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td className="px-4 py-3 font-medium text-slate-900">
+                    {t.name}
+                  </td>
+                  <td className="max-w-xs truncate px-4 py-3 text-slate-600">
                     {t.description ?? "—"}
                   </td>
                   <td className="px-4 py-3">
@@ -220,9 +228,9 @@ export default function TutoriaisPage() {
 
       <Dialog.Root open={modalOpen} onOpenChange={setModalOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-lg outline-none">
-            <div className="flex items-center justify-between mb-4">
+          <Dialog.Overlay className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-xl border border-slate-200 bg-white p-6 shadow-lg outline-none">
+            <div className="mb-4 flex items-center justify-between">
               <Dialog.Title className="text-lg font-semibold text-slate-900">
                 Novo tutorial
               </Dialog.Title>
@@ -271,7 +279,7 @@ export default function TutoriaisPage() {
                       name="type"
                       checked={formType === "video"}
                       onChange={() => setFormType("video")}
-                      className="text-primary h-4 w-4 border-slate-300 focus:ring-primary"
+                      className="text-primary focus:ring-primary h-4 w-4 border-slate-300"
                     />
                     <span className="text-sm text-slate-700">Vídeo (URL)</span>
                   </label>
@@ -281,7 +289,7 @@ export default function TutoriaisPage() {
                       name="type"
                       checked={formType === "file"}
                       onChange={() => setFormType("file")}
-                      className="text-primary h-4 w-4 border-slate-300 focus:ring-primary"
+                      className="text-primary focus:ring-primary h-4 w-4 border-slate-300"
                     />
                     <span className="text-sm text-slate-700">Arquivo</span>
                   </label>
@@ -309,10 +317,12 @@ export default function TutoriaisPage() {
                     type="file"
                     onChange={(e) => setFormFile(e.target.files?.[0] ?? null)}
                     accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg"
-                    className="w-full file:mr-2 file:rounded file:border-0 file:bg-primary/10 file:px-3 file:py-1 file:text-sm file:font-medium file:text-primary"
+                    className="file:bg-primary/10 file:text-primary w-full file:mr-2 file:rounded file:border-0 file:px-3 file:py-1 file:text-sm file:font-medium"
                   />
                   {formFile && (
-                    <p className="mt-1 text-xs text-slate-500">{formFile.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formFile.name}
+                    </p>
                   )}
                 </div>
               )}

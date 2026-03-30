@@ -41,7 +41,7 @@ export default function LoginPage() {
         <div className="relative z-10 max-w-lg space-y-6 text-center">
           {/* Placeholder for Logo or Illustration */}
           <div className="bg-primary mx-auto flex h-24 w-24 rotate-3 transform items-center justify-center rounded-xl shadow-lg">
-            <span className="text-3xl font-bold text-white">Inova</span>
+            <span className="text-xl font-bold text-white">TechLub</span>
           </div>
           <h2 className="text-foreground text-4xl font-bold">
             Gestão Inteligente para sua Indústria

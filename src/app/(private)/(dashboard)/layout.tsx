@@ -3,7 +3,7 @@ import { TopBar } from "@/components/layout/topbar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Inova ADM | Dashboard",
+  title: "TechLub ADM | Dashboard",
   description: "Visão Geral",
 };
 
@@ -19,10 +19,9 @@ export default function DashboardLayout({
 
       {/* Main Content Area */}
       <div className="flex h-full flex-1 flex-col overflow-hidden">
-
-        <main className="flex-1 relative overflow-y-auto p-6 lg:p-8">
-        <TopBar />
-          <div className="mx-auto w-full pt-16 max-w-7xl">{children}</div>
+        <main className="relative flex-1 overflow-y-auto p-6 lg:p-8">
+          <TopBar />
+          <div className="mx-auto w-full max-w-7xl pt-16">{children}</div>
         </main>
       </div>
     </div>
