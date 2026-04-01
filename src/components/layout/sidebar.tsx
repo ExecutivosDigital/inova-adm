@@ -10,7 +10,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminProfile } from "@/hooks/useAdminProfile";
 import { cn } from "@/lib/utils";
 import {
-  BookOpen,
   CalendarDays,
   ChevronLeft,
   Lock,
@@ -32,7 +31,6 @@ const menuItems = [
     href: "/programacao",
     enabled: true,
   },
-  { icon: BookOpen, label: "Tutoriais", href: "/tutoriais", enabled: true },
 ];
 
 export function Sidebar() {
