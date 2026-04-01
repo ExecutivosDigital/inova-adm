@@ -23,6 +23,14 @@ interface AutoGeneratePlanningOptions {
   routeIds?: string[];
   companyId?: string;
   balanceMode: 'by_os_count' | 'by_hours';
+  filters?: {
+    periodIds?: string[];
+    priorityIds?: string[];
+    teamIds?: string[];
+    serviceModelIds?: string[];
+    sectorIds?: string[];
+    equipmentTypeIds?: string[];
+  };
 }
 
 /**
@@ -150,6 +158,6 @@ export function getScheduleDuration(schedule: PlanningScheduleItem): number {
   if (schedule.type === 'route') {
     return schedule.durationMinutes ?? 120;
   } else {
-    return schedule.cipService?.executionTime?.minutes || 60;
+    return schedule.durationMinutes ?? schedule.cipService?.executionTime?.minutes ?? 60;
   }
 }

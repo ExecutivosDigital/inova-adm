@@ -146,6 +146,7 @@ export interface ServiceScheduleItem {
   id: string;
   cipServiceId: string;
   scheduledStartAt: string;
+  durationMinutes?: number;
   assignedWorkerIds?: string[];
   assignedWorkers?: Array<{ id: string; name: string }>;
   cipService?: CipService & {

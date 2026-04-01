@@ -12,7 +12,7 @@ import { PlanningRoutesFiltersPanel } from "@/components/planning-routes/Plannin
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
 import { combineSchedules, fetchSchedules, fetchWorkload } from "@/lib/planning-api";
-import type { ScheduleItem } from "@/lib/planning-advanced-types";
+import type { AutoGenerateFilters, ScheduleItem } from "@/lib/planning-advanced-types";
 import type {
   CompanySchedule,
   FilterServicesPayload,
@@ -23,7 +23,8 @@ import type {
   WorkloadIndicator,
 } from "@/lib/route-types";
 import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
-import { CalendarClock, SlidersHorizontal } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ChevronDown, ClipboardList, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -73,6 +74,7 @@ export function ProgramacaoCalendarContainer() {
   const [loading, setLoading] = useState(true);
   const [scheduleToConfirm, setScheduleToConfirm] = useState<ScheduleItem | null>(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [emitting, setEmitting] = useState(false);
   const [workOrders, setWorkOrders] = useState<WorkOrderSummary[]>([]);
   const [selectedWorkOrdersToView, setSelectedWorkOrdersToView] = useState<WorkOrderSummary[] | null>(null);
@@ -505,7 +507,7 @@ export function ProgramacaoCalendarContainer() {
   );
 
   const handleBulkConfirm = useCallback(
-    async (startDate: string, endDate: string) => {
+    async (startDate: string, endDate: string, _filters?: AutoGenerateFilters) => {
       const start = new Date(startDate).getTime();
       const end = new Date(endDate + "T23:59:59.999Z").getTime();
       const routeSchedulesInRange: ScheduleItem[] = [];
@@ -695,14 +697,31 @@ export function ProgramacaoCalendarContainer() {
                 </span>
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => setShowBulkModal(true)}
-              className="flex items-center gap-2 rounded border border-primary bg-white px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 sm:px-4 sm:py-2"
-            >
-              <CalendarClock className="h-4 w-4" />
-              Emitir ordens de serviço em lote
-            </button>
+            <Popover open={actionsMenuOpen} onOpenChange={setActionsMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 sm:px-3"
+                  aria-label="Ações do calendário"
+                >
+                  Ações
+                  <ChevronDown className="h-4 w-4 text-slate-400" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-56 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    setShowBulkModal(true);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                >
+                  <ClipboardList className="h-4 w-4 text-primary" />
+                  Emitir Ordens de Serviço em Lote
+                </button>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>
@@ -797,6 +816,7 @@ export function ProgramacaoCalendarContainer() {
         schedules={scheduleItems}
         scheduleIdsWithOS={scheduleIdsWithOS}
         getWOCountForSchedule={getWOCountForSchedule}
+        routeCipServices={routeCipServices}
         onConfirm={handleBulkConfirm}
         loading={emitting}
       />

@@ -243,7 +243,7 @@ export function AdvancedDayView({
 
   // Calcular posição e duração em slots (cada slot = 30 min) e atribuir lanes para evitar sobreposição
   const SLOT_MINUTES = 30;
-  const ROW_HEIGHT_PX = 48;
+  const ROW_HEIGHT_PX = 56;
 
   type SchedulePosition = {
     schedule: ScheduleItem;
@@ -263,10 +263,16 @@ export function AdvancedDayView({
       0,
       Math.floor((scheduleStartMinutes - startMin) / SLOT_MINUTES),
     );
-    const durationSlots = Math.max(
-      1,
-      Math.ceil(schedule.duration / SLOT_MINUTES),
-    );
+    // Calcular slots necessários pulando horário de almoço
+    let remainingMin = schedule.duration;
+    let slotsNeeded = 0;
+    for (let i = startSlotIndex; i < slots.length && remainingMin > 0; i++) {
+      slotsNeeded++;
+      if (!slots[i].isLunch) {
+        remainingMin -= SLOT_MINUTES;
+      }
+    }
+    const durationSlots = Math.max(1, slotsNeeded);
     const endSlotIndex = Math.min(startSlotIndex + durationSlots, slots.length);
     const actualDurationSlots = endSlotIndex - startSlotIndex;
 
@@ -508,7 +514,7 @@ export function AdvancedDayView({
             <div
               className="grid min-w-0 gap-0"
               style={{
-                gridTemplateColumns: `4rem repeat(${numLanes}, minmax(0, 1fr))`,
+                gridTemplateColumns: `4.5rem repeat(${numLanes}, minmax(0, 1fr))`,
                 gridTemplateRows: `repeat(${slots.length}, ${ROW_HEIGHT_PX}px)`,
                 width: "100%",
               }}
@@ -518,7 +524,7 @@ export function AdvancedDayView({
                 <div
                   key={slot.time}
                   className={cn(
-                    "flex items-start border-b border-slate-100 py-1 pr-2 text-sm font-medium text-slate-600",
+                    "flex items-start border-b border-slate-100 py-1 pr-2 text-base font-medium text-slate-600",
                     slot.isLunch && "bg-slate-50",
                   )}
                   style={{ gridRow: idx + 1, gridColumn: 1 }}
@@ -531,7 +537,7 @@ export function AdvancedDayView({
                 ({ schedule, startSlotIndex, durationSlots, lane }) => (
                   <div
                     key={schedule.id}
-                    className="min-h-0 min-w-0 overflow-hidden p-1"
+                    className="min-h-0 min-w-0 overflow-hidden px-0.5 py-0"
                     style={{
                       gridRow: `${startSlotIndex + 1} / span ${durationSlots}`,
                       gridColumn: lane + 2,
@@ -577,7 +583,7 @@ export function AdvancedDayView({
               <div
                 className="grid min-w-0 gap-0"
                 style={{
-                  gridTemplateColumns: `4rem repeat(${numLanes}, minmax(0, 1fr))`,
+                  gridTemplateColumns: `4.5rem repeat(${numLanes}, minmax(0, 1fr))`,
                   gridTemplateRows: `repeat(${slots.length}, ${ROW_HEIGHT_PX}px)`,
                   width: "100%",
                 }}
@@ -587,7 +593,7 @@ export function AdvancedDayView({
                   <div
                     key={`time-${slot.time}`}
                     className={cn(
-                      "flex items-start border-b border-slate-100 py-1 pr-2 text-sm font-medium text-slate-600",
+                      "flex items-start border-b border-slate-100 py-1 pr-2 text-base font-medium text-slate-600",
                       slot.isLunch && "bg-slate-50",
                     )}
                     style={{ gridRow: idx + 1, gridColumn: 1 }}
@@ -613,7 +619,7 @@ export function AdvancedDayView({
                         onClick={() =>
                           onAddSchedule("route", dateKey, slot.time)
                         }
-                        className="hover:text-primary text-xs text-slate-400"
+                        className="hover:text-primary text-sm text-slate-400"
                       >
                         + Adicionar
                       </button>
@@ -625,7 +631,7 @@ export function AdvancedDayView({
                   ({ schedule, startSlotIndex, durationSlots, lane }) => (
                     <div
                       key={schedule.id}
-                      className="min-h-0 min-w-0 overflow-hidden p-1"
+                      className="min-h-0 min-w-0 overflow-hidden px-0.5 py-0"
                       style={{
                         gridRow: `${startSlotIndex + 1} / span ${durationSlots}`,
                         gridColumn: lane + 2,
@@ -699,94 +705,106 @@ function ReadOnlyScheduleCard({
     return (
       <div
         className={cn(
-          "group flex h-full min-h-0 w-full min-w-0 flex-col justify-between rounded-lg border p-3",
+          "group relative flex h-full min-h-0 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border px-1.5 py-1",
           classes.border,
           classes.bg,
         )}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="font-bold text-slate-900">
-              {woCode ? `OS ${woCode}` : "OS emitida"}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-slate-600">
-              {displayName}
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-              <span>Duração: {formatDuration(schedule.duration)}</span>
-              <span>•</span>
-              <span className={cn("font-medium", classes.text)}>
-                {statusLabel}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="mt-2 flex shrink-0 items-center gap-1.5">
-          {onViewWorkOrders && (
-            <button
-              type="button"
-              onClick={() => onViewWorkOrders(workOrders)}
-              className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              title="Ver ordem(ns) de serviço"
-            >
-              <Eye className="h-3.5 w-3.5" />
-              Ver ordem{workOrders.length > 1 ? "ns" : ""}
-            </button>
+        <div
+          className={cn(
+            "min-w-0 flex-1 leading-snug",
+            onViewWorkOrders ? "pr-24" : "pr-[4.5rem]",
           )}
+        >
+          <p className="truncate text-sm text-slate-900">
+            <span className="font-semibold">
+              {woCode ? `OS ${woCode}` : "OS emitida"}
+            </span>
+            <span className="font-normal text-slate-600"> · {displayName}</span>
+            <span className="font-normal text-slate-500">
+              {" "}
+              · {formatDuration(schedule.duration)}
+            </span>
+          </p>
         </div>
+        <span
+          className={cn(
+            "absolute top-1 right-1 z-10 max-w-[42%] truncate rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+            classes.bg,
+            classes.text,
+            classes.border,
+          )}
+          title={statusLabel}
+        >
+          {statusLabel}
+        </span>
+        {onViewWorkOrders && (
+          <button
+            type="button"
+            onClick={() => onViewWorkOrders(workOrders)}
+            className="absolute right-1 bottom-1 z-10 rounded border border-slate-300 bg-white p-1 text-slate-700 hover:bg-slate-50"
+            title="Ver ordem(ns) de serviço"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        )}
       </div>
     );
   }
 
+  const variant = getScheduleCardVariant(schedule, workOrders);
+  const cardStyles = SCHEDULE_CARD_STYLES[variant];
+  const showOverdueBadge = variant === "overdue";
+
   return (
-    <div className="group border-primary/40 bg-primary/10 flex h-full min-h-0 w-full min-w-0 flex-col justify-between rounded-lg border p-3">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        {isRoute ? (
-          <RouteIcon className="text-primary h-4 w-4 shrink-0" />
-        ) : (
-          <Wrench className="text-primary h-4 w-4 shrink-0" />
+    <div
+      className={cn(
+        "group relative flex h-full min-h-0 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border px-1.5 py-1",
+        cardStyles.border,
+        cardStyles.bg,
+      )}
+    >
+      {isRoute ? (
+        <RouteIcon className="text-primary h-4 w-4 shrink-0" />
+      ) : (
+        <Wrench className="text-primary h-4 w-4 shrink-0" />
+      )}
+      <p
+        className={cn(
+          "min-w-0 flex-1 truncate text-sm leading-snug text-slate-900",
+          showOverdueBadge && onProgramar && "pr-24",
+          showOverdueBadge && !onProgramar && "pr-[4.5rem]",
+          !showOverdueBadge && onProgramar && "pr-9",
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-medium text-slate-900">{displayName}</p>
-            {hasWorkOrders &&
-              (() => {
-                const variant =
-                  getSummaryVariantForWorkOrders(workOrders) ?? "warning";
-                const classes = WORK_ORDER_VARIANT_CLASSES[variant];
-                return (
-                  <span
-                    className={cn(
-                      "flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium",
-                      classes.bg,
-                      classes.text,
-                      classes.border,
-                    )}
-                    title="Ordem(ns) de serviço emitida(s)"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Emitida
-                  </span>
-                );
-              })()}
-          </div>
-          <p className="text-xs text-slate-500">
-            Duração: {formatDuration(schedule.duration)}
-          </p>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {onProgramar && (
-          <button
-            type="button"
-            onClick={() => onProgramar(schedule)}
-            className="border-primary text-primary hover:bg-primary/5 flex shrink-0 items-center gap-1.5 rounded border bg-white px-2.5 py-1.5 text-sm font-medium"
-          >
-            <CalendarPlus className="h-4 w-4" />
-            Programar
-          </button>
-        )}
-      </div>
+      >
+        <span className="font-medium">{displayName}</span>
+        <span className="font-normal text-slate-500">
+          {" "}
+          · {formatDuration(schedule.duration)}
+        </span>
+      </p>
+      {showOverdueBadge && (
+        <span
+          className={cn(
+            "absolute top-1 right-1 z-10 rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+            cardStyles.badgeBorder,
+            cardStyles.badgeBg,
+            cardStyles.badgeText,
+          )}
+        >
+          Atrasado
+        </span>
+      )}
+      {onProgramar && (
+        <button
+          type="button"
+          onClick={() => onProgramar(schedule)}
+          className="border-primary text-primary hover:bg-primary/5 absolute right-1 bottom-1 z-10 shrink-0 rounded border bg-white p-0.5"
+          title="Programar"
+        >
+          <CalendarPlus className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }
@@ -924,12 +942,19 @@ function DraggableScheduleCard({
     : undefined;
   const isMoving = movingScheduleId === schedule.id;
 
+  const woCode = workOrders[0]?.code
+    ? String(workOrders[0].code).padStart(8, "0")
+    : null;
+  const showOverdueBadge = variant === "overdue" && !hasWO;
+  const rightReserve =
+    hasWO || showOverdueBadge ? "pr-[5.5rem]" : !locked ? "pr-16" : "pr-1";
+
   return (
     <div
       ref={setNodeRef}
       style={{ transform: cssTransform }}
       className={cn(
-        "group flex h-full min-h-0 w-full min-w-0 flex-col justify-between rounded-lg border p-3 transition-all",
+        "group relative flex h-full min-h-0 w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md border px-1.5 py-1 transition-all",
         styles.border,
         styles.bg,
         locked
@@ -941,59 +966,61 @@ function DraggableScheduleCard({
       {...(locked ? {} : listeners)}
       {...(locked ? {} : attributes)}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        {isRoute ? (
-          <RouteIcon className="text-primary h-4 w-4 shrink-0" />
-        ) : (
-          <Wrench className="text-primary h-4 w-4 shrink-0" />
+      {isRoute ? (
+        <RouteIcon className="text-primary h-4 w-4 shrink-0" />
+      ) : (
+        <Wrench className="text-primary h-4 w-4 shrink-0" />
+      )}
+      <p
+        className={cn(
+          "min-w-0 flex-1 truncate text-sm leading-snug text-slate-900",
+          rightReserve,
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-medium text-slate-900">{displayName}</p>
-            {hasWO &&
-              (() => {
-                const woCode = workOrders[0]?.code
-                  ? String(workOrders[0].code).padStart(8, "0")
-                  : null;
-                return (
-                  <span
-                    className={cn(
-                      "flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium",
-                      styles.badgeBorder,
-                      styles.badgeBg,
-                      styles.badgeText,
-                    )}
-                  >
-                    <CheckCircle2 className="h-3 w-3" />
-                    {woCode ? `OS ${woCode}` : "OS emitida"}
-                  </span>
-                );
-              })()}
-            {variant === "overdue" && !hasWO && (
-              <span
-                className={cn(
-                  "flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium",
-                  styles.badgeBorder,
-                  styles.badgeBg,
-                  styles.badgeText,
-                )}
-              >
-                Atrasado
-              </span>
+      >
+        <span className="font-medium">{displayName}</span>
+        <span className="font-normal text-slate-500">
+          {" "}
+          · {formatDuration(schedule.duration)}
+          {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
+            <span className="text-primary">
+              {" "}
+              · {schedule.assignedWorkerIds!.length} col.
+            </span>
+          )}
+        </span>
+      </p>
+      <div className="pointer-events-none absolute top-1 right-1 z-10 flex max-w-[48%] flex-col items-end gap-0.5">
+        {hasWO && (
+          <span
+            className={cn(
+              "pointer-events-none flex max-w-full items-center gap-0.5 truncate rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+              styles.badgeBorder,
+              styles.badgeBg,
+              styles.badgeText,
             )}
-          </div>
-          <p className="text-xs text-slate-500">
-            Duração: {formatDuration(schedule.duration)}
-            {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
-              <span className="text-primary ml-1">
-                · {schedule.assignedWorkerIds!.length} colaborador(es)
-              </span>
+            title={woCode ? `OS ${woCode}` : "OS emitida"}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {woCode ? `OS ${woCode}` : "OS emitida"}
+            </span>
+          </span>
+        )}
+        {showOverdueBadge && (
+          <span
+            className={cn(
+              "pointer-events-none rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+              styles.badgeBorder,
+              styles.badgeBg,
+              styles.badgeText,
             )}
-          </p>
-        </div>
+          >
+            Atrasado
+          </span>
+        )}
       </div>
       {!locked && (
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="absolute right-1 bottom-1 z-10 flex items-center gap-0">
           {onAssignWorkers && (
             <button
               type="button"
@@ -1001,10 +1028,10 @@ function DraggableScheduleCard({
                 e.stopPropagation();
                 onAssignWorkers();
               }}
-              className="hover:text-primary rounded p-1.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-100"
+              className="hover:text-primary pointer-events-auto rounded p-0.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-100"
               title="Atribuir colaboradores"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-3 w-3" />
             </button>
           )}
           <button
@@ -1013,10 +1040,10 @@ function DraggableScheduleCard({
               e.stopPropagation();
               onRemove();
             }}
-            className="shrink-0 rounded p-1.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
+            className="pointer-events-auto shrink-0 rounded p-0.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
             title="Remover"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3 w-3" />
           </button>
         </div>
       )}

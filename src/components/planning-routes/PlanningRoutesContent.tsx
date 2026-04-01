@@ -19,7 +19,10 @@ import type {
   Route,
   RouteCipServiceItem,
 } from "@/lib/route-types";
-import { formatExecutionMinutes, totalExecutionMinutes } from "@/lib/route-types";
+import {
+  formatExecutionMinutes,
+  totalExecutionMinutes,
+} from "@/lib/route-types";
 import {
   ArrowRight,
   Calendar,
@@ -78,11 +81,15 @@ const FIXED_SERVICE_TABLE_COLUMN_IDS: ServiceTableColumnId[] = [
   "equipment",
   "tag",
   "executionTime",
+  "period",
   "serviceModel",
   "cip",
 ];
 
-function getServiceCellValue(service: CipService | undefined, columnId: string): string | number {
+function getServiceCellValue(
+  service: CipService | undefined,
+  columnId: string,
+): string | number {
   if (!service) return "—";
   const eq = service.cip?.subset?.set?.equipment;
   const set = service.cip?.subset?.set;
@@ -132,7 +139,7 @@ function getServiceCellValue(service: CipService | undefined, columnId: string):
     case "executionTime":
       return service.executionTime?.minutes != null
         ? `${service.executionTime.minutes} min`
-        : service.executionTime?.name ?? "—";
+        : (service.executionTime?.name ?? "—");
     case "team":
       return service.team?.name ?? "—";
     case "serviceCondition":
@@ -162,22 +169,30 @@ export function PlanningRoutesContent() {
 
   const [routes, setRoutes] = useState<Route[]>([]);
   const [cipServices, setCipServices] = useState<CipService[]>([]);
-  const [routeCipServices, setRouteCipServices] = useState<RouteCipServiceItem[]>([]);
+  const [routeCipServices, setRouteCipServices] = useState<
+    RouteCipServiceItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [loadingServices, setLoadingServices] = useState(false);
   const [viewingRoute, setViewingRoute] = useState<Route | null>(null);
-  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
-  const [selectedRouteServiceIds, setSelectedRouteServiceIds] = useState<Set<string>>(new Set());
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectedRouteServiceIds, setSelectedRouteServiceIds] = useState<
+    Set<string>
+  >(new Set());
   const [filtersAccordionOpen, setFiltersAccordionOpen] = useState(false);
   const [filters, setFilters] = useState<FilterServicesPayload>({});
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [showSelectRouteModal, setShowSelectRouteModal] = useState(false);
-  const [serviceForDetails, setServiceForDetails] = useState<CipService | null>(null);
+  const [serviceForDetails, setServiceForDetails] = useState<CipService | null>(
+    null,
+  );
   const [routesAccordionOpen, setRoutesAccordionOpen] = useState(true);
-  const [visibleColumns, setVisibleColumns] = useState<ServiceTableColumnId[]>(() => [
-    ...FIXED_SERVICE_TABLE_COLUMN_IDS,
-  ]);
+  const [visibleColumns, setVisibleColumns] = useState<ServiceTableColumnId[]>(
+    () => [...FIXED_SERVICE_TABLE_COLUMN_IDS],
+  );
   const [pageAvailable, setPageAvailable] = useState(1);
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [routeServicesPaginated, setRouteServicesPaginated] = useState<{
@@ -209,7 +224,10 @@ export function PlanningRoutesContent() {
     if (res.status === 200 && res.body?.routes) {
       setRoutes(res.body.routes as Route[]);
     } else if (res.status !== 200) {
-      toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar rotas.");
+      toast.error(
+        (res.body as { message?: string })?.message ??
+          "Erro ao carregar rotas.",
+      );
     }
   }, [routeUrl, GetAPI]);
 
@@ -226,19 +244,24 @@ export function PlanningRoutesContent() {
           limit: limitPerPage,
           excludeWithServiceSchedule: true,
         },
-        true
+        true,
       );
       if (res.status === 200 && res.body?.cipServices) {
         setCipServices(res.body.cipServices as CipService[]);
-        setTotalAvailable(typeof res.body.total === "number" ? res.body.total : 0);
+        setTotalAvailable(
+          typeof res.body.total === "number" ? res.body.total : 0,
+        );
         setPageAvailable(page);
         setSelectedServiceIds(new Set());
       } else if (res.status !== 200) {
-        toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar serviços.");
+        toast.error(
+          (res.body as { message?: string })?.message ??
+            "Erro ao carregar serviços.",
+        );
       }
       setLoadingServices(false);
     },
-    [effectiveCompanyId, PostAPI]
+    [effectiveCompanyId, PostAPI],
   );
 
   const fetchRouteServicesPaginated = useCallback(
@@ -246,33 +269,43 @@ export function PlanningRoutesContent() {
       setLoadingRouteServices(true);
       const res = await GetAPI(
         `/route/single/${routeId}/services?page=${page}&limit=${limitPerPage}`,
-        true
+        true,
       );
       if (res.status === 200 && res.body?.routeCipServices) {
         setRouteServicesPaginated({
           routeCipServices: res.body.routeCipServices as RouteCipServiceItem[],
           total: typeof res.body.total === "number" ? res.body.total : 0,
           page: typeof res.body.page === "number" ? res.body.page : page,
-          limit: typeof res.body.limit === "number" ? res.body.limit : limitPerPage,
+          limit:
+            typeof res.body.limit === "number" ? res.body.limit : limitPerPage,
         });
       } else {
         setRouteServicesPaginated(null);
         if (res.status !== 200) {
-          toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar serviços da rota.");
+          toast.error(
+            (res.body as { message?: string })?.message ??
+              "Erro ao carregar serviços da rota.",
+          );
         }
       }
       setLoadingRouteServices(false);
     },
-    [GetAPI]
+    [GetAPI],
   );
 
   const fetchRouteCipServices = useCallback(async () => {
     if (!effectiveCompanyId) return;
-    const res = await GetAPI(`/route/company/${effectiveCompanyId}/route-services`, true);
+    const res = await GetAPI(
+      `/route/company/${effectiveCompanyId}/route-services`,
+      true,
+    );
     if (res.status === 200 && res.body?.routeCipServices) {
       setRouteCipServices(res.body.routeCipServices as RouteCipServiceItem[]);
     } else if (res.status !== 200) {
-      toast.error((res.body as { message?: string })?.message ?? "Erro ao carregar vínculos rota-serviço.");
+      toast.error(
+        (res.body as { message?: string })?.message ??
+          "Erro ao carregar vínculos rota-serviço.",
+      );
     }
   }, [effectiveCompanyId, GetAPI]);
 
@@ -312,32 +345,47 @@ export function PlanningRoutesContent() {
       fetchCipServices(newFilters, 1);
       setFiltersAccordionOpen(false);
     },
-    [fetchCipServices]
+    [fetchCipServices],
   );
 
-  const permanentRoutes = useMemo(() => routes.filter((r) => !r.isTemporary), [routes]);
+  const permanentRoutes = useMemo(
+    () => routes.filter((r) => !r.isTemporary),
+    [routes],
+  );
 
   const columnsToShow = useMemo(
     () =>
       SERVICE_TABLE_COLUMNS.filter(
-        (c) => visibleColumns.includes(c.id) || FIXED_SERVICE_TABLE_COLUMN_IDS.includes(c.id)
+        (c) =>
+          visibleColumns.includes(c.id) ||
+          FIXED_SERVICE_TABLE_COLUMN_IDS.includes(c.id),
       ),
-    [visibleColumns]
+    [visibleColumns],
   );
 
   const columnDropdownItems = useMemo(
     () => SERVICE_TABLE_COLUMNS.map((c) => ({ id: c.id, name: c.label })),
-    []
+    [],
   );
 
-  const handleColumnToggle = useCallback((columnId: string, checked: boolean) => {
-    if (!checked && FIXED_SERVICE_TABLE_COLUMN_IDS.includes(columnId as ServiceTableColumnId)) {
-      return;
-    }
-    setVisibleColumns((prev) =>
-      checked ? [...prev, columnId as ServiceTableColumnId] : prev.filter((c) => c !== columnId)
-    );
-  }, []);
+  const handleColumnToggle = useCallback(
+    (columnId: string, checked: boolean) => {
+      if (
+        !checked &&
+        FIXED_SERVICE_TABLE_COLUMN_IDS.includes(
+          columnId as ServiceTableColumnId,
+        )
+      ) {
+        return;
+      }
+      setVisibleColumns((prev) =>
+        checked
+          ? [...prev, columnId as ServiceTableColumnId]
+          : prev.filter((c) => c !== columnId),
+      );
+    },
+    [],
+  );
 
   const handleSelectAllColumns = useCallback(() => {
     setVisibleColumns(SERVICE_TABLE_COLUMNS.map((c) => c.id));
@@ -347,7 +395,10 @@ export function PlanningRoutesContent() {
     setVisibleColumns([...FIXED_SERVICE_TABLE_COLUMN_IDS]);
   }, []);
 
-  const totalPagesAvailable = Math.max(1, Math.ceil(totalAvailable / limitPerPage));
+  const totalPagesAvailable = Math.max(
+    1,
+    Math.ceil(totalAvailable / limitPerPage),
+  );
   const totalPagesRoute = useMemo(() => {
     const total = routeServicesPaginated?.total ?? 0;
     return Math.max(1, Math.ceil(total / limitPerPage));
@@ -359,7 +410,7 @@ export function PlanningRoutesContent() {
       setPageAvailable(p);
       fetchCipServices(filters, p);
     },
-    [fetchCipServices, filters, totalPagesAvailable]
+    [fetchCipServices, filters, totalPagesAvailable],
   );
 
   const goToPageRoute = useCallback(
@@ -368,7 +419,7 @@ export function PlanningRoutesContent() {
       const p = Math.max(1, Math.min(page, totalPagesRoute));
       fetchRouteServicesPaginated(viewingRoute.id, p);
     },
-    [viewingRoute, totalPagesRoute, fetchRouteServicesPaginated]
+    [viewingRoute, totalPagesRoute, fetchRouteServicesPaginated],
   );
 
   const activeFiltersCount = useMemo(() => {
@@ -393,7 +444,8 @@ export function PlanningRoutesContent() {
       "mainComponentIds",
       "powerUnitIds",
     ];
-    return keys.filter((k) => (filters[k] as string[] | undefined)?.length).length;
+    return keys.filter((k) => (filters[k] as string[] | undefined)?.length)
+      .length;
   }, [filters]);
 
   const servicesInViewingRoute = useMemo(() => {
@@ -405,7 +457,7 @@ export function PlanningRoutesContent() {
     const idsInPermanent = new Set(
       routeCipServices
         .filter((rcs) => permanentRoutes.some((r) => r.id === rcs.routeId))
-        .map((rcs) => rcs.cipServiceId)
+        .map((rcs) => rcs.cipServiceId),
     );
     return cipServices.filter((cs) => !idsInPermanent.has(cs.id));
   }, [cipServices, routeCipServices, permanentRoutes]);
@@ -421,7 +473,9 @@ export function PlanningRoutesContent() {
   /** Tempo total (min) dos serviços da rota visualizada (roda inteira, para exibir no header) */
   const totalExecutionMinutesViewingRoute = useMemo(() => {
     if (!viewingRoute) return 0;
-    const items = routeCipServices.filter((rcs) => rcs.routeId === viewingRoute.id);
+    const items = routeCipServices.filter(
+      (rcs) => rcs.routeId === viewingRoute.id,
+    );
     return totalExecutionMinutes(items);
   }, [viewingRoute, routeCipServices]);
 
@@ -442,14 +496,22 @@ export function PlanningRoutesContent() {
     return getRoutePeriodMismatchWarning(
       routePeriodId,
       cipServicesAvailableForRoute,
-      selectedServiceIds
+      selectedServiceIds,
     );
-  }, [selectedServiceIds, cipServicesAvailableForRoute, viewingRoute?.routePeriodId]);
+  }, [
+    selectedServiceIds,
+    cipServicesAvailableForRoute,
+    viewingRoute?.routePeriodId,
+  ]);
 
   const cipServiceIdsToRemove = useMemo(() => {
     if (!viewingRoute) return [];
     return routeCipServices
-      .filter((rcs) => rcs.routeId === viewingRoute.id && selectedRouteServiceIds.has(rcs.id))
+      .filter(
+        (rcs) =>
+          rcs.routeId === viewingRoute.id &&
+          selectedRouteServiceIds.has(rcs.id),
+      )
       .map((rcs) => rcs.cipServiceId);
   }, [viewingRoute, routeCipServices, selectedRouteServiceIds]);
 
@@ -479,7 +541,9 @@ export function PlanningRoutesContent() {
   const allAvailableSelected =
     cipServicesAvailableForRoute.length > 0 &&
     cipServicesAvailableForRoute.every((cs) => selectedServiceIds.has(cs.id));
-  const someAvailableSelected = cipServicesAvailableForRoute.some((cs) => selectedServiceIds.has(cs.id));
+  const someAvailableSelected = cipServicesAvailableForRoute.some((cs) =>
+    selectedServiceIds.has(cs.id),
+  );
 
   const toggleAllAvailableServices = useCallback(() => {
     if (allAvailableSelected) {
@@ -501,13 +565,17 @@ export function PlanningRoutesContent() {
     !!viewingRoute &&
     servicesInViewingRoute.length > 0 &&
     servicesInViewingRoute.every((rcs) => selectedRouteServiceIds.has(rcs.id));
-  const someRouteServicesSelected = servicesInViewingRoute.some((rcs) => selectedRouteServiceIds.has(rcs.id));
+  const someRouteServicesSelected = servicesInViewingRoute.some((rcs) =>
+    selectedRouteServiceIds.has(rcs.id),
+  );
 
   const toggleAllRouteServices = useCallback(() => {
     if (allRouteServicesSelected) {
       setSelectedRouteServiceIds(new Set());
     } else {
-      setSelectedRouteServiceIds(new Set(servicesInViewingRoute.map((rcs) => rcs.id)));
+      setSelectedRouteServiceIds(
+        new Set(servicesInViewingRoute.map((rcs) => rcs.id)),
+      );
     }
   }, [allRouteServicesSelected, servicesInViewingRoute]);
 
@@ -530,35 +598,49 @@ export function PlanningRoutesContent() {
 
   const handleAddToRoute = useCallback(
     async (routeId: string) => {
-      const availableIds = new Set(cipServicesAvailableForRoute.map((cs) => cs.id));
-      const validIds = Array.from(selectedServiceIds).filter((id) => availableIds.has(id));
+      const availableIds = new Set(
+        cipServicesAvailableForRoute.map((cs) => cs.id),
+      );
+      const validIds = Array.from(selectedServiceIds).filter((id) =>
+        availableIds.has(id),
+      );
       if (validIds.length === 0) {
         toast.error("Nenhum serviço válido selecionado.");
         return;
       }
-      const res = await PostAPI(`/route/single/${routeId}/services`, { cipServiceIds: validIds }, true);
+      const res = await PostAPI(
+        `/route/single/${routeId}/services`,
+        { cipServiceIds: validIds },
+        true,
+      );
       if (res.status === 200 || res.status === 201) {
         setSelectedServiceIds(new Set());
         fetchRouteCipServices();
         fetchRoutes();
         if (viewingRoute?.id === routeId) {
-          fetchRouteServicesPaginated(routeId, routeServicesPaginated?.page ?? 1);
+          fetchRouteServicesPaginated(
+            routeId,
+            routeServicesPaginated?.page ?? 1,
+          );
         }
         toast.success("Serviços adicionados à rota.");
       } else {
-        toast.error((res.body as { message?: string })?.message ?? "Erro ao adicionar serviços.");
+        toast.error(
+          (res.body as { message?: string })?.message ??
+            "Erro ao adicionar serviços.",
+        );
       }
     },
     [
-        selectedServiceIds,
-        cipServicesAvailableForRoute,
-        PostAPI,
-        fetchRouteCipServices,
-        fetchRoutes,
-        viewingRoute?.id,
-        routeServicesPaginated?.page,
-        fetchRouteServicesPaginated,
-      ]
+      selectedServiceIds,
+      cipServicesAvailableForRoute,
+      PostAPI,
+      fetchRouteCipServices,
+      fetchRoutes,
+      viewingRoute?.id,
+      routeServicesPaginated?.page,
+      fetchRouteServicesPaginated,
+    ],
   );
 
   const handleRemoveFromRoute = useCallback(async () => {
@@ -566,16 +648,22 @@ export function PlanningRoutesContent() {
     const res = await PostAPI(
       `/route/single/${viewingRoute.id}/services/remove`,
       { cipServiceIds: cipServiceIdsToRemove },
-      true
+      true,
     );
     if (res.status === 200) {
       setSelectedRouteServiceIds(new Set());
       fetchRouteCipServices();
       fetchRoutes();
-      fetchRouteServicesPaginated(viewingRoute.id, routeServicesPaginated?.page ?? 1);
+      fetchRouteServicesPaginated(
+        viewingRoute.id,
+        routeServicesPaginated?.page ?? 1,
+      );
       toast.success("Serviços removidos da rota.");
     } else {
-      toast.error((res.body as { message?: string })?.message ?? "Erro ao remover serviços.");
+      toast.error(
+        (res.body as { message?: string })?.message ??
+          "Erro ao remover serviços.",
+      );
     }
   }, [
     viewingRoute,
@@ -596,16 +684,22 @@ export function PlanningRoutesContent() {
         fetchRouteCipServices();
         toast.success("Rota excluída.");
       } else {
-        toast.error((res.body as { message?: string })?.message ?? "Erro ao excluir rota.");
+        toast.error(
+          (res.body as { message?: string })?.message ??
+            "Erro ao excluir rota.",
+        );
       }
     },
-    [viewingRoute, DeleteAPI, fetchRoutes, fetchRouteCipServices]
+    [viewingRoute, DeleteAPI, fetchRoutes, fetchRouteCipServices],
   );
 
   const handleDeleteRouteClick = useCallback(
     async (route: Route) => {
       try {
-        const res = await GetAPI(`/route/single/${route.id}/deletion-info`, true);
+        const res = await GetAPI(
+          `/route/single/${route.id}/deletion-info`,
+          true,
+        );
         if (res.status !== 200 || !res.body) {
           toast.error("Não foi possível verificar a rota.");
           return;
@@ -617,9 +711,7 @@ export function PlanningRoutesContent() {
         const hasDependencies = workOrderCount > 0 || routeScheduleCount > 0;
         const parts: string[] = [];
         if (workOrderCount > 0) {
-          parts.push(
-            `${workOrderCount} ordem(ns) de serviço emitida(s)`
-          );
+          parts.push(`${workOrderCount} ordem(ns) de serviço emitida(s)`);
         }
         if (routeScheduleCount > 0) {
           parts.push(`${routeScheduleCount} agendamento(s)`);
@@ -639,7 +731,7 @@ export function PlanningRoutesContent() {
         toast.error("Erro ao verificar a rota.");
       }
     },
-    [GetAPI, handleDeleteRoute]
+    [GetAPI, handleDeleteRoute],
   );
 
   if (!effectiveCompanyId) {
@@ -657,7 +749,7 @@ export function PlanningRoutesContent() {
   if (loading && routes.length === 0) {
     return (
       <div className="flex min-h-[200px] items-center justify-center rounded-lg border border-slate-100 bg-white">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -726,232 +818,286 @@ export function PlanningRoutesContent() {
                 </button>
               </div>
               {permanentRoutes.length === 0 ? (
-                <p className="text-slate-500 text-sm">
-                  Nenhuma rota cadastrada. Crie uma nova rota pelo botão acima ou adicione serviços à rota na tabela &quot;Serviços disponíveis&quot;.
+                <p className="text-sm text-slate-500">
+                  Nenhuma rota cadastrada. Crie uma nova rota pelo botão acima
+                  ou adicione serviços à rota na tabela &quot;Serviços
+                  disponíveis&quot;.
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {permanentRoutes.map((route) => (
-              <div
-                key={route.id}
-                className="flex items-center gap-2 rounded-lg border bg-slate-50 px-3 py-2"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleViewingRoute(route)}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
-                    viewingRoute?.id === route.id
-                      ? "border-primary bg-primary text-white"
-                      : "border-slate-200 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  {route.code} – {route.name}
-                  {(totalExecutionMinutesByRouteId.get(route.id) ?? 0) > 0 && (
-                    <span className="ml-1.5 opacity-90">
-                      ({formatExecutionMinutes(totalExecutionMinutesByRouteId.get(route.id) ?? 0)})
-                    </span>
-                  )}
-                  {route.period?.name && (
-                    <span
-                      className={`ml-1.5 inline-flex items-center gap-0.5 opacity-90 ${
-                        viewingRoute?.id === route.id ? "text-white" : "text-slate-500"
-                      }`}
-                      title="Período da rota"
+                    <div
+                      key={route.id}
+                      className="flex items-center gap-2 rounded-lg border bg-slate-50 px-3 py-2"
                     >
-                      <Calendar className="h-3.5 w-3.5" aria-hidden />
-                      {route.period.name}
+                      <button
+                        type="button"
+                        onClick={() => toggleViewingRoute(route)}
+                        className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                          viewingRoute?.id === route.id
+                            ? "border-primary bg-primary text-white"
+                            : "border-slate-200 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {route.code} – {route.name}
+                        {(totalExecutionMinutesByRouteId.get(route.id) ?? 0) >
+                          0 && (
+                          <span className="ml-1.5 opacity-90">
+                            (
+                            {formatExecutionMinutes(
+                              totalExecutionMinutesByRouteId.get(route.id) ?? 0,
+                            )}
+                            )
+                          </span>
+                        )}
+                        {route.period?.name && (
+                          <span
+                            className={`ml-1.5 inline-flex items-center gap-0.5 opacity-90 ${
+                              viewingRoute?.id === route.id
+                                ? "text-white"
+                                : "text-slate-500"
+                            }`}
+                            title="Período da rota"
+                          >
+                            <Calendar className="h-3.5 w-3.5" aria-hidden />
+                            {route.period.name}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditRoute(route)}
+                        className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                        title="Editar rota"
+                      >
+                        <RouteIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRouteClick(route)}
+                        className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        title="Excluir rota"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {viewingRoute && (
+                <p className="text-primary mt-2 flex flex-wrap items-center gap-2 text-xs font-medium">
+                  <span>
+                    Visualizando: {viewingRoute.code} – {viewingRoute.name}
+                  </span>
+                  {viewingRoute.period?.name && (
+                    <span className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded px-1.5 py-0.5">
+                      <Calendar className="h-3 w-3" aria-hidden />
+                      {viewingRoute.period.name}
                     </span>
                   )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleEditRoute(route)}
-                  className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                  title="Editar rota"
-                >
-                  <RouteIcon className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteRouteClick(route)}
-                  className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  title="Excluir rota"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        {viewingRoute && (
-          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary font-medium">
-            <span>Visualizando: {viewingRoute.code} – {viewingRoute.name}</span>
-            {viewingRoute.period?.name && (
-              <span className="inline-flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-primary">
-                <Calendar className="h-3 w-3" aria-hidden />
-                {viewingRoute.period.name}
-              </span>
-            )}
-          </p>
-        )}
+                </p>
+              )}
             </div>
             {/* Tabela: Serviços nesta rota (dentro do accordion) */}
             {viewingRoute && (
               <div className="border-t border-slate-100 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h3 className="font-semibold text-slate-900">
-                Serviços nesta rota
-                {totalExecutionMinutesViewingRoute > 0 && (
-                  <span className="ml-2 font-normal text-slate-600">
-                    (total: {formatExecutionMinutes(totalExecutionMinutesViewingRoute)})
-                  </span>
-                )}
-              </h3>
-              <p className="text-xs text-slate-500">
-                Selecione os serviços para remover da rota.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleRemoveFromRoute}
-                disabled={cipServiceIdsToRemove.length === 0}
-                className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={cipServiceIdsToRemove.length === 0 ? "Selecione serviços na tabela para remover" : "Remover selecionados da rota"}
-              >
-                <Minus className="h-4 w-4" />
-                Remover da rota
-              </button>
-              <MultiSelectDropdown
-                label="Colunas"
-                items={columnDropdownItems}
-                selectedIds={visibleColumns}
-                onToggle={handleColumnToggle}
-                searchPlaceholder="Buscar coluna..."
-                className="w-[200px] shrink-0"
-                showSelectAllDeselectAll
-                onSelectAll={handleSelectAllColumns}
-                onDeselectAll={handleDeselectAllColumns}
-                fixedIds={FIXED_SERVICE_TABLE_COLUMN_IDS}
-              />
-            </div>
-          </div>
-          {loadingRouteServices ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : servicesInViewingRoute.length === 0 ? (
-            <div className="p-6 text-center text-sm text-slate-500">
-              Nenhum serviço nesta rota.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-slate-100 hover:bg-transparent">
-                  <TableHead className="w-10">
-                    <label className="flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={allRouteServicesSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = someRouteServicesSelected && !allRouteServicesSelected;
-                        }}
-                        onChange={toggleAllRouteServices}
-                        className="h-4 w-4 rounded border-slate-300 text-primary"
-                      />
-                    </label>
-                  </TableHead>
-                  {columnsToShow.map((col) => (
-                    <TableHead
-                      key={col.id}
-                      className="text-slate-500"
-                      title={FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) ? "Campo fixo – não pode ser removido" : undefined}
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">
+                      Serviços nesta rota
+                      {totalExecutionMinutesViewingRoute > 0 && (
+                        <span className="ml-2 font-normal text-slate-600">
+                          (total:{" "}
+                          {formatExecutionMinutes(
+                            totalExecutionMinutesViewingRoute,
+                          )}
+                          )
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Selecione os serviços para remover da rota.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRemoveFromRoute}
+                      disabled={cipServiceIdsToRemove.length === 0}
+                      className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      title={
+                        cipServiceIdsToRemove.length === 0
+                          ? "Selecione serviços na tabela para remover"
+                          : "Remover selecionados da rota"
+                      }
                     >
-                      <span className="inline-flex items-center gap-1.5">
-                        {col.label}
-                        {FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) && (
-                          <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                        )}
-                      </span>
-                    </TableHead>
-                  ))}
-                  <TableHead className="w-16">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {servicesInViewingRoute.map((rcs) => (
-                  <TableRow
-                    key={rcs.id}
-                    className={`cursor-pointer border-slate-100 ${
-                      selectedRouteServiceIds.has(rcs.id) ? "bg-primary/5" : "hover:bg-slate-50/50"
-                    }`}
-                    onClick={() => toggleRouteServiceSelection(rcs.id)}
-                  >
-                    <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedRouteServiceIds.has(rcs.id)}
-                        onChange={() => toggleRouteServiceSelection(rcs.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-primary"
-                      />
-                    </TableCell>
-                    {columnsToShow.map((col) => (
-                      <TableCell key={col.id} className="text-slate-700 text-sm">
-                        {getServiceCellValue(rcs.cipService, col.id)}
-                      </TableCell>
-                    ))}
-                    <TableCell className="w-16" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => rcs.cipService && setServiceForDetails(rcs.cipService)}
-                        className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                        title="Ver detalhes do serviço"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-          {viewingRoute &&
-            routeServicesPaginated &&
-            routeServicesPaginated.total > limitPerPage && (
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
-                <p className="text-sm text-slate-600">
-                  {((routeServicesPaginated.page - 1) * limitPerPage + 1)}–
-                  {Math.min(
-                    routeServicesPaginated.page * limitPerPage,
-                    routeServicesPaginated.total
-                  )}{" "}
-                  de {routeServicesPaginated.total} serviços
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => goToPageRoute(routeServicesPaginated!.page - 1)}
-                    disabled={routeServicesPaginated.page <= 1}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span className="text-sm text-slate-600">
-                    Página {routeServicesPaginated.page} de {totalPagesRoute}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => goToPageRoute(routeServicesPaginated!.page + 1)}
-                    disabled={routeServicesPaginated.page >= totalPagesRoute}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                      <Minus className="h-4 w-4" />
+                      Remover da rota
+                    </button>
+                    <MultiSelectDropdown
+                      label="Colunas"
+                      items={columnDropdownItems}
+                      selectedIds={visibleColumns}
+                      onToggle={handleColumnToggle}
+                      searchPlaceholder="Buscar coluna..."
+                      className="w-[200px] shrink-0"
+                      showSelectAllDeselectAll
+                      onSelectAll={handleSelectAllColumns}
+                      onDeselectAll={handleDeselectAllColumns}
+                      fixedIds={FIXED_SERVICE_TABLE_COLUMN_IDS}
+                    />
+                  </div>
                 </div>
+                {loadingRouteServices ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="text-primary h-6 w-6 animate-spin" />
+                  </div>
+                ) : servicesInViewingRoute.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-slate-500">
+                    Nenhum serviço nesta rota.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-slate-100 hover:bg-transparent">
+                        <TableHead className="w-10">
+                          <label className="flex cursor-pointer items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={allRouteServicesSelected}
+                              ref={(el) => {
+                                if (el)
+                                  el.indeterminate =
+                                    someRouteServicesSelected &&
+                                    !allRouteServicesSelected;
+                              }}
+                              onChange={toggleAllRouteServices}
+                              className="text-primary h-4 w-4 rounded border-slate-300"
+                            />
+                          </label>
+                        </TableHead>
+                        {columnsToShow.map((col) => (
+                          <TableHead
+                            key={col.id}
+                            className="text-slate-500"
+                            title={
+                              FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id)
+                                ? "Campo fixo – não pode ser removido"
+                                : undefined
+                            }
+                          >
+                            <span className="inline-flex items-center gap-1.5">
+                              {col.label}
+                              {FIXED_SERVICE_TABLE_COLUMN_IDS.includes(
+                                col.id,
+                              ) && (
+                                <Lock
+                                  className="h-3.5 w-3.5 shrink-0 text-slate-400"
+                                  aria-hidden
+                                />
+                              )}
+                            </span>
+                          </TableHead>
+                        ))}
+                        <TableHead className="w-16">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {servicesInViewingRoute.map((rcs) => (
+                        <TableRow
+                          key={rcs.id}
+                          className={`cursor-pointer border-slate-100 ${
+                            selectedRouteServiceIds.has(rcs.id)
+                              ? "bg-primary/5"
+                              : "hover:bg-slate-50/50"
+                          }`}
+                          onClick={() => toggleRouteServiceSelection(rcs.id)}
+                        >
+                          <TableCell
+                            className="w-10"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedRouteServiceIds.has(rcs.id)}
+                              onChange={() =>
+                                toggleRouteServiceSelection(rcs.id)
+                              }
+                              className="text-primary h-4 w-4 rounded border-slate-300"
+                            />
+                          </TableCell>
+                          {columnsToShow.map((col) => (
+                            <TableCell
+                              key={col.id}
+                              className="text-sm text-slate-700"
+                            >
+                              {getServiceCellValue(rcs.cipService, col.id)}
+                            </TableCell>
+                          ))}
+                          <TableCell
+                            className="w-16"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() =>
+                                rcs.cipService &&
+                                setServiceForDetails(rcs.cipService)
+                              }
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+                              title="Ver detalhes do serviço"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+                {viewingRoute &&
+                  routeServicesPaginated &&
+                  routeServicesPaginated.total > limitPerPage && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
+                      <p className="text-sm text-slate-600">
+                        {(routeServicesPaginated.page - 1) * limitPerPage + 1}–
+                        {Math.min(
+                          routeServicesPaginated.page * limitPerPage,
+                          routeServicesPaginated.total,
+                        )}{" "}
+                        de {routeServicesPaginated.total} serviços
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            goToPageRoute(routeServicesPaginated!.page - 1)
+                          }
+                          disabled={routeServicesPaginated.page <= 1}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <span className="text-sm text-slate-600">
+                          Página {routeServicesPaginated.page} de{" "}
+                          {totalPagesRoute}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            goToPageRoute(routeServicesPaginated!.page + 1)
+                          }
+                          disabled={
+                            routeServicesPaginated.page >= totalPagesRoute
+                          }
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
               </div>
-            )}
-            </div>
             )}
           </>
         )}
@@ -959,11 +1105,14 @@ export function PlanningRoutesContent() {
 
       {/* Tabela: Serviços disponíveis */}
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-slate-50 px-4 py-3">
           <div>
-            <h3 className="font-semibold text-slate-900">Serviços disponíveis</h3>
+            <h3 className="font-semibold text-slate-900">
+              Serviços disponíveis
+            </h3>
             <p className="text-xs text-slate-500">
-              Serviços ainda não vinculados a nenhuma rota. Selecione e adicione a uma rota.
+              Serviços ainda não vinculados a nenhuma rota. Selecione e adicione
+              a uma rota.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -971,7 +1120,10 @@ export function PlanningRoutesContent() {
               type="button"
               onClick={() => {
                 if (viewingRoute && selectedServiceIds.size > 0) {
-                  if (routePeriodMismatchWarning.shouldWarn && routePeriodMismatchWarning.message) {
+                  if (
+                    routePeriodMismatchWarning.shouldWarn &&
+                    routePeriodMismatchWarning.message
+                  ) {
                     setConfirmDialog({
                       open: true,
                       title: "Atenção",
@@ -989,33 +1141,40 @@ export function PlanningRoutesContent() {
                 }
               }}
               disabled={selectedServiceIds.size === 0}
-              className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              title={selectedServiceIds.size === 0 ? "Selecione serviços na tabela" : viewingRoute ? "Adicionar à rota visualizada" : "Escolher rota para adicionar"}
+              className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              title={
+                selectedServiceIds.size === 0
+                  ? "Selecione serviços na tabela"
+                  : viewingRoute
+                    ? "Adicionar à rota visualizada"
+                    : "Escolher rota para adicionar"
+              }
             >
               <ArrowRight className="h-4 w-4" />
               Adicionar à rota
             </button>
             <MultiSelectDropdown
-            label="Colunas"
-            items={columnDropdownItems}
-            selectedIds={visibleColumns}
-            onToggle={handleColumnToggle}
-            searchPlaceholder="Buscar coluna..."
-            className="w-[200px] shrink-0"
-            showSelectAllDeselectAll
-            onSelectAll={handleSelectAllColumns}
-            onDeselectAll={handleDeselectAllColumns}
-            fixedIds={FIXED_SERVICE_TABLE_COLUMN_IDS}
-          />
+              label="Colunas"
+              items={columnDropdownItems}
+              selectedIds={visibleColumns}
+              onToggle={handleColumnToggle}
+              searchPlaceholder="Buscar coluna..."
+              className="w-[200px] shrink-0"
+              showSelectAllDeselectAll
+              onSelectAll={handleSelectAllColumns}
+              onDeselectAll={handleDeselectAllColumns}
+              fixedIds={FIXED_SERVICE_TABLE_COLUMN_IDS}
+            />
           </div>
         </div>
         {loadingServices ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <Loader2 className="text-primary h-6 w-6 animate-spin" />
           </div>
         ) : cipServicesAvailableForRoute.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
-            Nenhum serviço disponível (todos já estão em alguma rota, já possuem agendamento ou não há resultados).
+            Nenhum serviço disponível (todos já estão em alguma rota, já possuem
+            agendamento ou não há resultados).
           </div>
         ) : (
           <Table>
@@ -1027,10 +1186,12 @@ export function PlanningRoutesContent() {
                       type="checkbox"
                       checked={allAvailableSelected}
                       ref={(el) => {
-                        if (el) el.indeterminate = someAvailableSelected && !allAvailableSelected;
+                        if (el)
+                          el.indeterminate =
+                            someAvailableSelected && !allAvailableSelected;
                       }}
                       onChange={toggleAllAvailableServices}
-                      className="h-4 w-4 rounded border-slate-300 text-primary"
+                      className="text-primary h-4 w-4 rounded border-slate-300"
                     />
                   </label>
                 </TableHead>
@@ -1038,12 +1199,19 @@ export function PlanningRoutesContent() {
                   <TableHead
                     key={col.id}
                     className="text-slate-500"
-                    title={FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) ? "Campo fixo – não pode ser removido" : undefined}
+                    title={
+                      FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id)
+                        ? "Campo fixo – não pode ser removido"
+                        : undefined
+                    }
                   >
                     <span className="inline-flex items-center gap-1.5">
                       {col.label}
                       {FIXED_SERVICE_TABLE_COLUMN_IDS.includes(col.id) && (
-                        <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                        <Lock
+                          className="h-3.5 w-3.5 shrink-0 text-slate-400"
+                          aria-hidden
+                        />
                       )}
                     </span>
                   </TableHead>
@@ -1056,24 +1224,32 @@ export function PlanningRoutesContent() {
                 <TableRow
                   key={cs.id}
                   className={`cursor-pointer border-slate-100 ${
-                    selectedServiceIds.has(cs.id) ? "bg-primary/5" : "hover:bg-slate-50/50"
+                    selectedServiceIds.has(cs.id)
+                      ? "bg-primary/5"
+                      : "hover:bg-slate-50/50"
                   }`}
                   onClick={() => toggleServiceSelection(cs.id)}
                 >
-                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    className="w-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedServiceIds.has(cs.id)}
                       onChange={() => toggleServiceSelection(cs.id)}
-                      className="h-4 w-4 m-auto rounded border-slate-300 text-primary"
+                      className="text-primary m-auto h-4 w-4 rounded border-slate-300"
                     />
                   </TableCell>
                   {columnsToShow.map((col) => (
-                    <TableCell key={col.id} className="text-slate-700 text-sm">
+                    <TableCell key={col.id} className="text-sm text-slate-700">
                       {getServiceCellValue(cs, col.id)}
                     </TableCell>
                   ))}
-                  <TableCell className="w-16" onClick={(e) => e.stopPropagation()}>
+                  <TableCell
+                    className="w-16"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       type="button"
                       onClick={() => setServiceForDetails(cs)}
@@ -1091,8 +1267,9 @@ export function PlanningRoutesContent() {
         {totalAvailable > limitPerPage && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3">
             <p className="text-sm text-slate-600">
-              {((pageAvailable - 1) * limitPerPage + 1)}–
-              {Math.min(pageAvailable * limitPerPage, totalAvailable)} de {totalAvailable} serviços
+              {(pageAvailable - 1) * limitPerPage + 1}–
+              {Math.min(pageAvailable * limitPerPage, totalAvailable)} de{" "}
+              {totalAvailable} serviços
             </p>
             <div className="flex items-center gap-2">
               <button
@@ -1129,8 +1306,12 @@ export function PlanningRoutesContent() {
         effectiveCompanyId={effectiveCompanyId}
         isSuperAdmin={isSuperAdmin}
         onSuccess={handleRouteModalSuccess}
-        initialSelectedServiceIds={editingRoute ? undefined : Array.from(selectedServiceIds)}
-        initialCipServices={editingRoute ? undefined : cipServicesAvailableForRoute}
+        initialSelectedServiceIds={
+          editingRoute ? undefined : Array.from(selectedServiceIds)
+        }
+        initialCipServices={
+          editingRoute ? undefined : cipServicesAvailableForRoute
+        }
         fetchRouteCipServices={fetchRouteCipServices}
         createRoutePayload={{ companyId: effectiveCompanyId }}
         postApi={PostAPI}
@@ -1148,7 +1329,7 @@ export function PlanningRoutesContent() {
             const warning = getRoutePeriodMismatchWarning(
               route.routePeriodId ?? null,
               cipServicesAvailableForRoute,
-              Array.from(selectedServiceIds)
+              Array.from(selectedServiceIds),
             );
             if (warning.shouldWarn && warning.message) {
               setConfirmDialog({
@@ -1186,7 +1367,9 @@ export function PlanningRoutesContent() {
 
       <ConfirmDialog
         open={confirmDialog.open}
-        onOpenChange={(open) => !open && setConfirmDialog((prev) => ({ ...prev, open: false }))}
+        onOpenChange={(open) =>
+          !open && setConfirmDialog((prev) => ({ ...prev, open: false }))
+        }
         title={confirmDialog.title}
         description={confirmDialog.description}
         confirmLabel={confirmDialog.confirmLabel ?? "Confirmar"}

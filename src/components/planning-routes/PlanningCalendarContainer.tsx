@@ -337,7 +337,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
           type: "service" as const,
           serviceId: schedule.cipServiceId,
           scheduledStartAt: schedule.scheduledStartAt,
-          duration: cip?.executionTime?.minutes || 60,
+          duration: schedule.durationMinutes ?? cip?.executionTime?.minutes ?? 60,
           ...base,
           service: cip
             ? {
@@ -347,7 +347,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
                   cip.cip?.subset?.set?.equipment?.name ||
                   cip.cip?.subset?.set?.equipment?.tag ||
                   "Equipamento",
-                duration: cip.executionTime?.minutes || 60,
+                duration: schedule.durationMinutes ?? cip.executionTime?.minutes ?? 60,
                 periodDays: cip.period?.days || undefined,
               }
             : undefined,
@@ -709,6 +709,14 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
       serviceIds?: string[];
       routeIds?: string[];
       balanceMode: "by_os_count" | "by_hours";
+      filters?: {
+        periodIds?: string[];
+        priorityIds?: string[];
+        teamIds?: string[];
+        serviceModelIds?: string[];
+        sectorIds?: string[];
+        equipmentTypeIds?: string[];
+      };
     }) => {
       if (!effectiveCompanyId) return;
 

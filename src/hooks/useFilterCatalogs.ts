@@ -57,8 +57,7 @@ const emptyCatalogs: FilterCatalogs = {
   powerUnits: [],
 };
 
-function normalizeCatalog(body: unknown, key: string): CatalogItem[] {
-  const arr = (body as Record<string, unknown>)?.[key];
+function normalizeCatalog(arr: unknown): CatalogItem[] {
   if (!Array.isArray(arr)) return [];
   return arr.map((item: { id: string; name: string; days?: number; description?: string | null }) => ({
     id: item.id,
@@ -86,88 +85,34 @@ export function useFilterCatalogs() {
     const companyQuery = isSuperAdmin ? `?companyId=${effectiveCompanyId}` : "";
 
     try {
-      const [
-        periodRes,
-        priorityRes,
-        teamRes,
-        serviceConditionRes,
-        jobSystemRes,
-        executionTimeRes,
-        extraTeamRes,
-        estimatedExtraTeamTimeRes,
-        serviceModelRes,
-        epiRes,
-        toolkitRes,
-        sectorRes,
-        equipmentTypeRes,
-        manufacturerRes,
-        costCenterRes,
-        safetyConditionRes,
-        lubricationSystemRes,
-        mainComponentRes,
-        powerUnitRes,
-      ] = await Promise.all([
-        GetAPI("/period", true),
-        GetAPI("/priority", true),
-        GetAPI("/team", true),
-        GetAPI("/service-condition", true),
-        GetAPI("/job-system", true),
-        GetAPI("/execution-time", true),
-        GetAPI("/extra-team", true),
-        GetAPI("/estimated-extra-team-time", true),
-        GetAPI("/service-model", true),
-        GetAPI(isSuperAdmin ? `/epi${companyQuery}` : "/epi", true),
-        GetAPI(isSuperAdmin ? `/toolkit${companyQuery}` : "/toolkit", true),
-        GetAPI(isSuperAdmin ? `/sector${companyQuery}` : "/sector", true),
-        GetAPI("/equipment-type", true),
-        GetAPI("/manufacturer", true),
-        GetAPI(isSuperAdmin ? `/cost-center${companyQuery}` : "/cost-center", true),
-        GetAPI("/safety-condition", true),
-        GetAPI("/lubrication-system", true),
-        GetAPI("/main-component", true),
-        GetAPI("/power-unit", true),
-      ]);
+      const res = await GetAPI(`/filter-catalogs${companyQuery}`, true);
 
-      setCatalogs({
-        periods: periodRes.status === 200 ? normalizeCatalog(periodRes.body, "periods") : [],
-        priorities: priorityRes.status === 200 ? normalizeCatalog(priorityRes.body, "priorities") : [],
-        teams: teamRes.status === 200 ? normalizeCatalog(teamRes.body, "teams") : [],
-        serviceConditions:
-          serviceConditionRes.status === 200 ? normalizeCatalog(serviceConditionRes.body, "serviceConditions") : [],
-        jobSystems: jobSystemRes.status === 200 ? normalizeCatalog(jobSystemRes.body, "jobSystems") : [],
-        executionTimes:
-          executionTimeRes.status === 200 ? normalizeCatalog(executionTimeRes.body, "executionTimes") : [],
-        extraTeams: extraTeamRes.status === 200 ? normalizeCatalog(extraTeamRes.body, "extraTeams") : [],
-        estimatedExtraTeamTimes:
-          estimatedExtraTeamTimeRes.status === 200
-            ? normalizeCatalog(estimatedExtraTeamTimeRes.body, "estimatedExtraTeamTimes")
-            : [],
-        serviceModels:
-          serviceModelRes.status === 200 ? normalizeCatalog(serviceModelRes.body, "serviceModels") : [],
-        epis: epiRes.status === 200 ? normalizeCatalog(epiRes.body, "epis") : [],
-        toolkits: toolkitRes.status === 200 ? normalizeCatalog(toolkitRes.body, "toolkits") : [],
-        sectors: sectorRes.status === 200 ? normalizeCatalog(sectorRes.body, "sectors") : [],
-        equipmentTypes:
-          equipmentTypeRes.status === 200 ? normalizeCatalog(equipmentTypeRes.body, "equipmentTypes") : [],
-        manufacturers:
-          manufacturerRes.status === 200 ? normalizeCatalog(manufacturerRes.body, "manufacturers") : [],
-        costCenters:
-          costCenterRes.status === 200 ? normalizeCatalog(costCenterRes.body, "costCenters") : [],
-        safetyConditions:
-          safetyConditionRes.status === 200
-            ? normalizeCatalog(safetyConditionRes.body, "safetyConditions")
-            : [],
-        lubricationSystems:
-          lubricationSystemRes.status === 200
-            ? normalizeCatalog(lubricationSystemRes.body, "lubricationSystems")
-            : [],
-        mainComponents:
-          mainComponentRes.status === 200
-            ? normalizeCatalog(mainComponentRes.body, "mainComponents")
-            : [],
-        powerUnits:
-          powerUnitRes.status === 200 ? normalizeCatalog(powerUnitRes.body, "powerUnits") : [],
-      });
+      if (res.status === 200 && res.body) {
+        const b = res.body;
+        setCatalogs({
+          periods: normalizeCatalog(b.periods),
+          priorities: normalizeCatalog(b.priorities),
+          teams: normalizeCatalog(b.teams),
+          serviceConditions: normalizeCatalog(b.serviceConditions),
+          jobSystems: normalizeCatalog(b.jobSystems),
+          executionTimes: normalizeCatalog(b.executionTimes),
+          extraTeams: normalizeCatalog(b.extraTeams),
+          estimatedExtraTeamTimes: normalizeCatalog(b.estimatedExtraTeamTimes),
+          serviceModels: normalizeCatalog(b.serviceModels),
+          epis: normalizeCatalog(b.epis),
+          toolkits: normalizeCatalog(b.toolkits),
+          sectors: normalizeCatalog(b.sectors),
+          equipmentTypes: normalizeCatalog(b.equipmentTypes),
+          manufacturers: normalizeCatalog(b.manufacturers),
+          costCenters: normalizeCatalog(b.costCenters),
+          safetyConditions: normalizeCatalog(b.safetyConditions),
+          lubricationSystems: normalizeCatalog(b.lubricationSystems),
+          mainComponents: normalizeCatalog(b.mainComponents),
+          powerUnits: normalizeCatalog(b.powerUnits),
+        });
+      } else {
+        setCatalogs(emptyCatalogs);
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao carregar catálogos";
       setError(msg);

@@ -1,9 +1,17 @@
 "use client";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { AutoGenerateOptions, PlanningBalanceMode } from "@/lib/planning-advanced-types";
-import { Calendar, Loader2, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { MultiSelectDropdown } from "@/components/ui/multi-select-dropdown";
+import { useApiContext } from "@/context/ApiContext";
+import { useCompany } from "@/context/CompanyContext";
+import { useFilterCatalogs } from "@/hooks/useFilterCatalogs";
+import type {
+  AutoGenerateFilters,
+  AutoGenerateOptions,
+  PlanningBalanceMode,
+} from "@/lib/planning-advanced-types";
+import { Calendar, ChevronDown, Filter, Info, Loader2, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /** Agendamento com pelo menos data de início (para contagem no período) */
 interface ScheduleWithDate {
@@ -14,7 +22,6 @@ interface ScheduleWithDate {
 interface AutoGenerateModalProps {
   open: boolean;
   onClose: () => void;
-  /** Agendamentos já existentes (para mostrar quantos serão ignorados no período) */
   existingSchedules?: ScheduleWithDate[];
   onGenerate: (options: AutoGenerateOptions) => void;
   loading?: boolean;
@@ -38,13 +45,106 @@ export function AutoGenerateModal({
     oneYearLater.setFullYear(today.getFullYear() + 1);
     return oneYearLater.toISOString().split("T")[0];
   });
-  const [validationAlert, setValidationAlert] = useState<{ open: boolean; message: string }>({
+  const [validationAlert, setValidationAlert] = useState<{
+    open: boolean;
+    message: string;
+  }>({
     open: false,
     message: "",
   });
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
-  const [pendingOptions, setPendingOptions] = useState<AutoGenerateOptions | null>(null);
-  const [balanceMode, setBalanceMode] = useState<PlanningBalanceMode>("by_os_count");
+  const [pendingOptions, setPendingOptions] =
+    useState<AutoGenerateOptions | null>(null);
+  const [balanceMode, setBalanceMode] =
+    useState<PlanningBalanceMode>("by_os_count");
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<AutoGenerateFilters>({});
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+
+  const { catalogs, loading: catalogsLoading } = useFilterCatalogs();
+  const { PostAPI } = useApiContext();
+  const { effectiveCompanyId } = useCompany();
+
+  // Preview counts
+  const [previewCounts, setPreviewCounts] = useState<{
+    services: number | null;
+    routes: number | null;
+    loading: boolean;
+  }>({ services: null, routes: null, loading: false });
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!open || !effectiveCompanyId) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setPreviewCounts((prev) => ({ ...prev, loading: true }));
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const filterPayload: Record<string, unknown> = {
+          companyId: effectiveCompanyId,
+        };
+        if (filters.periodIds?.length) filterPayload.periodIds = filters.periodIds;
+        if (filters.priorityIds?.length) filterPayload.priorityIds = filters.priorityIds;
+        if (filters.teamIds?.length) filterPayload.teamIds = filters.teamIds;
+        if (filters.serviceModelIds?.length) filterPayload.serviceModelIds = filters.serviceModelIds;
+        if (filters.sectorIds?.length) filterPayload.sectorIds = filters.sectorIds;
+        if (filters.equipmentTypeIds?.length) filterPayload.equipmentTypeIds = filters.equipmentTypeIds;
+
+        const [serviceRes, routeRes] = await Promise.all([
+          PostAPI("/filter-services", { ...filterPayload, limit: 1, page: 1, excludeInPermanentRoutes: true }, true),
+          PostAPI("/planning/route-count", filterPayload, true),
+        ]);
+
+        const serviceTotal =
+          serviceRes.status === 200
+            ? (serviceRes.body as { total?: number })?.total ?? null
+            : null;
+        const routeTotal =
+          routeRes.status === 200
+            ? (routeRes.body as { count?: number })?.count ?? null
+            : null;
+
+        setPreviewCounts({ services: serviceTotal, routes: routeTotal, loading: false });
+      } catch {
+        setPreviewCounts({ services: null, routes: null, loading: false });
+      }
+    }, 400);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [open, filters, effectiveCompanyId, PostAPI]);
+
+  const toggleFilterArray = useCallback(
+    (key: keyof AutoGenerateFilters, id: string, checked: boolean) => {
+      setFilters((prev) => {
+        const arr = (prev[key] as string[] | undefined) ?? [];
+        const next = [...arr];
+        if (checked) {
+          if (!next.includes(id)) next.push(id);
+        } else {
+          const i = next.indexOf(id);
+          if (i !== -1) next.splice(i, 1);
+        }
+        return { ...prev, [key]: next.length ? next : undefined };
+      });
+    },
+    [],
+  );
+
+  const activeFilterCount = useMemo(
+    () =>
+      [
+        filters.periodIds?.length,
+        filters.priorityIds?.length,
+        filters.teamIds?.length,
+        filters.serviceModelIds?.length,
+        filters.sectorIds?.length,
+        filters.equipmentTypeIds?.length,
+      ].filter((n) => n && n > 0).length,
+    [filters],
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +157,11 @@ export function AutoGenerateModal({
       return;
     }
 
-    setPendingOptions({ startDate, endDate, balanceMode });
+    const options: AutoGenerateOptions = { startDate, endDate, balanceMode };
+    if (activeFilterCount > 0) {
+      options.filters = filters;
+    }
+    setPendingOptions(options);
     setShowGenerateConfirm(true);
   };
 
@@ -89,183 +193,314 @@ export function AutoGenerateModal({
 
   const daysDiff = Math.ceil(
     (new Date(endDate).getTime() - new Date(startDate).getTime()) /
-      (1000 * 60 * 60 * 24)
+      (1000 * 60 * 60 * 24),
   );
-  
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
       <div className="flex min-h-full items-center justify-center p-4 sm:p-6">
-        <div className="my-4 w-full max-w-2xl max-h-[min(90dvh,900px)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
-        <div className="mb-4 flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold text-slate-900">
-            Gerar Planejamento Automático
-          </h3>
-        </div>
-        
-        <p className="mb-4 text-sm text-slate-600">
-          O sistema gera agendamentos conforme a periodicidade de cada serviço ou rota. O modo de
-          balanceamento define como as datas são distribuídas no período.
-        </p>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <fieldset className="space-y-2">
-            <legend className="mb-1 block text-sm font-medium text-slate-700">
-              Modo de balanceamento
-            </legend>
-            <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-              <input
-                type="radio"
-                name="balanceMode"
-                value="by_os_count"
-                checked={balanceMode === "by_os_count"}
-                onChange={() => setBalanceMode("by_os_count")}
-                className="mt-0.5 shrink-0"
-              />
-              <span className="min-w-0 text-sm break-words text-slate-700">
-                <span className="font-medium">Por quantidade de OS</span>
-                <span className="mt-0.5 block text-slate-600">
-                  Distribui as ordens de serviço de forma uniforme entre os dias úteis do período.
-                  Serviços com contagem a partir da última execução (e data de última execução
-                  preenchida) mantêm o calendário alinhado à periodicidade a partir dessa data.
-                </span>
-              </span>
-            </label>
-            <label className="flex min-w-0 cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-              <input
-                type="radio"
-                name="balanceMode"
-                value="by_hours"
-                checked={balanceMode === "by_hours"}
-                onChange={() => setBalanceMode("by_hours")}
-                className="mt-0.5 shrink-0"
-              />
-              <span className="min-w-0 text-sm break-words text-slate-700">
-                <span className="font-medium">Por quantidade de horas</span>
-                <span className="mt-0.5 block text-slate-600">
-                  Coloca cada agendamento na data calculada estritamente pela periodicidade (comportamento
-                  anterior). O balanceamento fino por carga de horas será tratado em uma próxima etapa.
-                </span>
-              </span>
-            </label>
-          </fieldset>
+        <div className="my-4 max-h-[min(90dvh,900px)] w-full max-w-2xl overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+          {/* Header */}
+          <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-100 bg-white px-6 py-4">
+            <Sparkles className="text-primary h-5 w-5 shrink-0" />
+            <h3 className="text-lg font-semibold text-slate-900">
+              Gerar Planejamento Automático
+            </h3>
+          </div>
 
-          {/* Período */}
-          <div className="space-y-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Data de Início
-              </label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                required
-              />
+          <form onSubmit={handleSubmit} className="space-y-4 px-6 py-4">
+            {/* Modo de balanceamento - compacto */}
+            <fieldset className="space-y-2">
+              <legend className="mb-1 block text-sm font-medium text-slate-700">
+                Modo de balanceamento
+              </legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/5 flex cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3">
+                  <input
+                    type="radio"
+                    name="balanceMode"
+                    value="by_os_count"
+                    checked={balanceMode === "by_os_count"}
+                    onChange={() => setBalanceMode("by_os_count")}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <span className="min-w-0 text-sm text-slate-700">
+                    <span className="font-medium">Por quantidade de OS</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      Distribui uniformemente entre dias úteis
+                    </span>
+                  </span>
+                </label>
+                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/5 flex cursor-pointer items-start gap-2 rounded-md border border-slate-200 p-3">
+                  <input
+                    type="radio"
+                    name="balanceMode"
+                    value="by_hours"
+                    checked={balanceMode === "by_hours"}
+                    onChange={() => setBalanceMode("by_hours")}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <span className="min-w-0 text-sm text-slate-700">
+                    <span className="font-medium">Por quantidade de horas</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      Data calculada pela periodicidade
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+
+            {/* Período - datas lado a lado */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Data de Início
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Data de Fim
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                  required
+                />
+              </div>
             </div>
-            
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Data de Fim
-              </label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            
+
+            {/* Info compacta do período */}
             {daysDiff > 0 && (
-              <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-800">
-                <p>
-                  Período selecionado: <strong>{daysDiff} dias</strong>
-                </p>
-                <p className="mt-1">
-                  O total de OS geradas depende da periodicidade; no modo &quot;por quantidade de
-                  OS&quot;, a distribuição entre dias úteis tende a uniformizar a carga.
-                </p>
-                <p className="mt-1.5 text-blue-700">
-                  Rotas e serviços que já possuem agendamento no período serão ignorados.
-                </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <span>
+                  Período: <strong className="text-slate-700">{daysDiff} dias</strong>
+                </span>
+                {summary.existingInPeriodCount > 0 && (
+                  <span className="text-amber-600">
+                    {summary.existingInPeriodCount} agendamento(s) existente(s) serão ignorados
+                  </span>
+                )}
               </div>
             )}
-          </div>
 
-          {/* Resumo do período (estilo igual à modal de OS em lote) */}
-          <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
-            <p className="font-medium text-slate-700">Resumo do período</p>
-            <p className="mt-1">
-              Novos agendamentos seguem a periodicidade configurada. Agendamentos já existentes no
-              período serão ignorados.
-            </p>
-            {summary.existingInPeriodCount > 0 && (
-              <p className="mt-1.5 text-amber-700">
-                <span className="font-medium">{summary.existingInPeriodCount}</span> agendamento(s) já existem no período selecionado e serão ignorados
-                {summary.routeCount > 0 || summary.serviceCount > 0 ? (
-                  <span> ({summary.routeCount} rota(s), {summary.serviceCount} serviço(s))</span>
-                ) : null}.
-              </p>
-            )}
-          </div>
-          
-          {/* Informações adicionais */}
-          <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-            <p className="font-medium mb-1">Como funciona:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>
-                No modo por OS: ancora serviços com &quot;contar período a partir da última
-                execução&quot; e última execução preenchida; os demais preenchem o período com a
-                mesma quantidade de visitas, em dias úteis balanceados.
-              </li>
-              <li>
-                No modo por horas: cada data é obtida diretamente da periodicidade (como antes).
-              </li>
-              <li>Respeita dias úteis da empresa e horário comercial configurado.</li>
-              <li>Você poderá ajustar manualmente após a geração.</li>
-            </ul>
-          </div>
-          
-          {/* Botões */}
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              disabled={loading}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading || daysDiff <= 0}
-              className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {loading ? (
+            {/* Filtros colapsáveis */}
+            <div className="rounded-md border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowFilters((v) => !v)}
+                className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <span className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-slate-400" />
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs font-medium">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 text-slate-400 transition-transform ${showFilters ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {showFilters && (
+                <div className="border-t border-slate-200 px-3 py-3">
+                  {catalogsLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-4">
+                      <Loader2 className="text-primary h-4 w-4 animate-spin" />
+                      <span className="text-xs text-slate-500">Carregando filtros...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-xs text-slate-500">
+                        Limite a geração apenas para rotas e serviços que atendam aos filtros selecionados.
+                      </p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {catalogs.periods.length > 0 && (
+                          <MultiSelectDropdown
+                            label="Periodicidade"
+                            items={catalogs.periods}
+                            selectedIds={filters.periodIds ?? []}
+                            onToggle={(id, checked) =>
+                              toggleFilterArray("periodIds", id, checked)
+                            }
+                            searchPlaceholder="Buscar periodicidade..."
+                          />
+                        )}
+                        {catalogs.priorities.length > 0 && (
+                          <MultiSelectDropdown
+                            label="Prioridade"
+                            items={catalogs.priorities}
+                            selectedIds={filters.priorityIds ?? []}
+                            onToggle={(id, checked) =>
+                              toggleFilterArray("priorityIds", id, checked)
+                            }
+                            searchPlaceholder="Buscar prioridade..."
+                          />
+                        )}
+                        {catalogs.teams.length > 0 && (
+                          <MultiSelectDropdown
+                            label="Time"
+                            items={catalogs.teams}
+                            selectedIds={filters.teamIds ?? []}
+                            onToggle={(id, checked) =>
+                              toggleFilterArray("teamIds", id, checked)
+                            }
+                            searchPlaceholder="Buscar time..."
+                          />
+                        )}
+                        {catalogs.serviceModels.length > 0 && (
+                          <MultiSelectDropdown
+                            label="Modelo de serviço"
+                            items={catalogs.serviceModels}
+                            selectedIds={filters.serviceModelIds ?? []}
+                            onToggle={(id, checked) =>
+                              toggleFilterArray("serviceModelIds", id, checked)
+                            }
+                            searchPlaceholder="Buscar modelo..."
+                          />
+                        )}
+                        {catalogs.sectors.length > 0 && (
+                          <MultiSelectDropdown
+                            label="Setor"
+                            items={catalogs.sectors}
+                            selectedIds={filters.sectorIds ?? []}
+                            onToggle={(id, checked) =>
+                              toggleFilterArray("sectorIds", id, checked)
+                            }
+                            searchPlaceholder="Buscar setor..."
+                          />
+                        )}
+                        {catalogs.equipmentTypes.length > 0 && (
+                          <MultiSelectDropdown
+                            label="Tipo de equipamento"
+                            items={catalogs.equipmentTypes}
+                            selectedIds={filters.equipmentTypeIds ?? []}
+                            onToggle={(id, checked) =>
+                              toggleFilterArray("equipmentTypeIds", id, checked)
+                            }
+                            searchPlaceholder="Buscar tipo..."
+                          />
+                        )}
+                      </div>
+                      {activeFilterCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setFilters({})}
+                          className="mt-2 text-xs text-slate-500 underline hover:text-slate-700"
+                        >
+                          Limpar filtros
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Preview de contagem */}
+            <div className="flex items-center gap-3 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {previewCounts.loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Gerando...
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                  <span>Calculando...</span>
                 </>
               ) : (
                 <>
-                  <Calendar className="h-4 w-4" />
-                  Gerar Planejamento
+                  <span>
+                    Serviços: <strong className="text-slate-800">{previewCounts.services ?? "—"}</strong>
+                  </span>
+                  <span className="text-slate-300">|</span>
+                  <span>
+                    Rotas: <strong className="text-slate-800">{previewCounts.routes ?? "—"}</strong>
+                  </span>
+                  {activeFilterCount > 0 && (
+                    <span className="text-slate-400">(filtrado)</span>
+                  )}
                 </>
               )}
+            </div>
+
+            {/* Como funciona - colapsável */}
+            <button
+              type="button"
+              onClick={() => setShowHowItWorks((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600"
+            >
+              <Info className="h-3.5 w-3.5" />
+              <span className="underline">Como funciona?</span>
             </button>
-          </div>
-        </form>
+
+            {showHowItWorks && (
+              <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-500">
+                <ul className="list-inside list-disc space-y-1">
+                  <li>
+                    <strong>Por OS:</strong> ancora serviços com última execução
+                    preenchida; distribui os demais em dias úteis balanceados.
+                  </li>
+                  <li>
+                    <strong>Por horas:</strong> data obtida diretamente da
+                    periodicidade.
+                  </li>
+                  <li>Respeita dias úteis e horário comercial configurado.</li>
+                  <li>Agendamentos já existentes no período serão ignorados.</li>
+                  <li>Você poderá ajustar manualmente após a geração.</li>
+                </ul>
+              </div>
+            )}
+
+            {/* Botões */}
+            <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={loading}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || daysDiff <= 0}
+                className="bg-primary hover:bg-primary/90 flex items-center gap-2 rounded px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-4 w-4" />
+                    Gerar Planejamento
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
       <ConfirmDialog
         open={validationAlert.open}
-        onOpenChange={(open) => !open && setValidationAlert((prev) => ({ ...prev, open: false }))}
+        onOpenChange={(open) =>
+          !open && setValidationAlert((prev) => ({ ...prev, open: false }))
+        }
         title="Data inválida"
         description={validationAlert.message}
-        onConfirm={() => setValidationAlert((prev) => ({ ...prev, open: false }))}
+        onConfirm={() =>
+          setValidationAlert((prev) => ({ ...prev, open: false }))
+        }
         alertMode
       />
 
@@ -278,7 +513,11 @@ export function AutoGenerateModal({
           }
         }}
         title="Gerar planejamento automático"
-        description="Tem certeza que deseja gerar o planejamento automático? Rotas e serviços que já possuem agendamento no período serão ignorados."
+        description={
+          activeFilterCount > 0
+            ? `Tem certeza que deseja gerar o planejamento automático com ${activeFilterCount} filtro(s) aplicado(s)? Rotas e serviços que já possuem agendamento no período serão ignorados.`
+            : "Tem certeza que deseja gerar o planejamento automático? Rotas e serviços que já possuem agendamento no período serão ignorados."
+        }
         confirmLabel="Gerar"
         onConfirm={handleConfirmGenerate}
       />

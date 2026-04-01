@@ -163,18 +163,18 @@ function ReadOnlyMonthScheduleCard({
   return (
     <div
       className={cn(
-        "rounded border px-1 py-0.5 text-left flex items-center gap-1 min-w-0",
+        "rounded border px-1.5 py-0.5 text-left flex items-center gap-1 min-w-0",
         "border-primary/40 bg-primary/10"
       )}
-      title={displayName}
+      title={`${displayName} · ${timeStr}`}
     >
       {isRoute ? (
-        <RouteIcon className="h-2.5 w-2.5 shrink-0 text-primary" />
+        <RouteIcon className="h-3 w-3 shrink-0 text-primary" />
       ) : (
-        <Wrench className="h-2.5 w-2.5 shrink-0 text-primary" />
+        <Wrench className="h-3 w-3 shrink-0 text-primary" />
       )}
-      <span className="text-[9px] text-slate-700 truncate min-w-0">{displayName}</span>
-      <span className="text-[8px] text-slate-500 shrink-0">{timeStr}</span>
+      <span className="text-xs text-slate-700 truncate min-w-0">{displayName}</span>
+      <span className="text-[10px] text-slate-500 shrink-0">{timeStr}</span>
     </div>
   );
 }
@@ -218,12 +218,12 @@ function DraggableMonthScheduleCard({
       {...attributes}
     >
       {isRoute ? (
-        <RouteIcon className="h-2.5 w-2.5 shrink-0 text-primary" />
+        <RouteIcon className="h-3 w-3 shrink-0 text-primary" />
       ) : (
-        <Wrench className="h-2.5 w-2.5 shrink-0 text-primary" />
+        <Wrench className="h-3 w-3 shrink-0 text-primary" />
       )}
-      <span className="text-[9px] text-slate-700 truncate min-w-0 flex-1">{displayName}</span>
-      <span className="text-[8px] group-hover:opacity-0 text-slate-500 shrink-0">{timeStr}</span>
+      <span className="text-xs text-slate-700 truncate min-w-0 flex-1">{displayName}</span>
+      <span className="text-[10px] group-hover:opacity-0 text-slate-500 shrink-0">{timeStr}</span>
       <div className="shrink-0 absolute top-1/2 -translate-y-1/2 right-1 flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
         {onAssignWorkers && (
           <button
@@ -232,7 +232,7 @@ function DraggableMonthScheduleCard({
             className="rounded p-0.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
             title="Atribuir colaboradores"
           >
-            <Users className="h-2.5 w-2.5" />
+            <Users className="h-3 w-3" />
           </button>
         )}
         {onRemove && (
@@ -242,7 +242,7 @@ function DraggableMonthScheduleCard({
             className="rounded p-0.5 text-slate-400 hover:bg-red-100 hover:text-red-600"
             title="Remover"
           >
-            <Trash2 className="h-2.5 w-2.5" />
+            <Trash2 className="h-3 w-3" />
           </button>
         )}
       </div>
@@ -388,14 +388,12 @@ export function AdvancedMonthlyCalendar({
           key={dateKey}
           type="button"
           onClick={() => onMonthChange?.(new Date(cellYear, cellMonth - 1, day))}
-          className="flex min-h-[120px] flex-col rounded-lg border border-slate-100 bg-slate-50/50 px-2 py-2 text-left transition-all hover:border-slate-200 hover:bg-slate-100/80"
+          className="flex min-h-[80px] flex-col rounded-lg border border-slate-100 bg-slate-50/50 px-2 py-1.5 text-left transition-all hover:border-slate-200 hover:bg-slate-100/80"
           title={`Ir para ${day}/${cellMonth}/${cellYear}`}
         >
           <span className="text-sm font-medium text-slate-400">{day}</span>
-          {daySchedules.length > 0 ? (
-            <div className="mt-1 text-[9px] text-slate-500">{daySchedules.length} agend.</div>
-          ) : (
-            <div className="mt-1 text-[9px] text-slate-400">—</div>
+          {daySchedules.length > 0 && (
+            <div className="mt-0.5 text-xs text-slate-500">{daySchedules.length} agend.</div>
           )}
         </button>
       );
@@ -403,28 +401,34 @@ export function AdvancedMonthlyCalendar({
 
     const droppableId = `month-day-${dateKey}`;
 
+    const MAX_VISIBLE_SCHEDULES = 3;
+    const hiddenCount = daySchedules.length > MAX_VISIBLE_SCHEDULES ? daySchedules.length - MAX_VISIBLE_SCHEDULES : 0;
+    const visibleSchedules = daySchedules.slice(0, MAX_VISIBLE_SCHEDULES);
+
     const cellContent = (
       <>
-        <div className="mb-1 flex items-center justify-between gap-0.5">
-          <span className="font-semibold text-slate-900 text-sm">{day}</span>
-          {!hasNoPlanning && (
-            <span
-              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", getCapacityDot(indicator))}
-              title={getCapacityDotTitle(indicator)}
-            />
-          )}
-        </div>
-        {indicator ? (
-          <div className="text-[9px] flex items-center justify-between w-full text-slate-600 space-y-0.5" title={`Agendado: ${indicator.scheduledHours.toFixed(1)}h | Disponível: ${indicator.availableHours.toFixed(1)}h | Utilização: ${indicator.utilization.toFixed(0)}%`}>
-            <div className="font-medium">{indicator.scheduledHours.toFixed(0)}h/{indicator.availableHours.toFixed(0)}h</div>
-            <div>{indicator.utilization.toFixed(0)}% · {routeCount}r {serviceCount}s</div>
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-sm font-semibold text-slate-900">{day}</span>
+          <div className="flex items-center gap-1.5">
+            {!hasNoPlanning && indicator && (
+              <span
+                className="text-[11px] text-slate-500 tabular-nums"
+                title={`Agendado: ${indicator.scheduledHours.toFixed(1)}h | Disponível: ${indicator.availableHours.toFixed(1)}h`}
+              >
+                {indicator.utilization.toFixed(0)}%
+              </span>
+            )}
+            {!hasNoPlanning && (
+              <span
+                className={cn("h-2 w-2 shrink-0 rounded-full", getCapacityDot(indicator))}
+                title={getCapacityDotTitle(indicator)}
+              />
+            )}
           </div>
-        ) : (
-          <div className="text-[9px] text-slate-400">—</div>
-        )}
-        {schedules.length > 0 && (
-          <div className="mt-1.5 space-y-0.5 overflow-y-auto flex-1 min-h-0 max-h-[72px]">
-            {daySchedules.map((schedule) => {
+        </div>
+        {daySchedules.length > 0 && (
+          <div className="mt-1 space-y-0.5 min-h-0">
+            {visibleSchedules.map((schedule) => {
               const isRoute = schedule.type === "route";
               const displayName = isRoute
                 ? `${schedule.route?.code ?? ""} – ${schedule.route?.name ?? "Rota"}`
@@ -460,6 +464,11 @@ export function AdvancedMonthlyCalendar({
                 />
               );
             })}
+            {hiddenCount > 0 && (
+              <span className="text-[11px] font-medium text-primary">
+                +{hiddenCount} mais
+              </span>
+            )}
           </div>
         )}
       </>
@@ -486,7 +495,7 @@ export function AdvancedMonthlyCalendar({
         type="button"
         onClick={() => onDateClick?.(dateKey)}
         className={cn(
-          "flex min-h-[120px] flex-col rounded-lg border-2 px-2 py-2 text-left transition-all overflow-hidden",
+          "flex min-h-[80px] flex-col rounded-lg border-2 px-2 py-1.5 text-left transition-all overflow-hidden",
           "hover:shadow-md",
           dayCardColor,
           isTodayDay && "ring-2 ring-primary ring-offset-2"
@@ -498,9 +507,9 @@ export function AdvancedMonthlyCalendar({
   };
 
   const content = (
-    <div className="grid grid-cols-7 gap-2">
+    <div className="grid grid-cols-7 gap-1">
       {WEEKDAYS.map((day) => (
-        <div key={day} className="text-center text-sm font-medium text-slate-700 py-2">
+        <div key={day} className="text-center text-xs font-semibold text-slate-600 py-1.5">
           {day}
         </div>
       ))}
@@ -510,55 +519,55 @@ export function AdvancedMonthlyCalendar({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-center gap-4">
-          <button type="button" onClick={() => onMonthChange?.(new Date(year, month - 2, 1))} className="rounded-md p-2 text-slate-600 hover:bg-slate-100">
-            <ChevronLeft className="h-5 w-5" />
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => onMonthChange?.(new Date(year, month - 2, 1))} className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100">
+            <ChevronLeft className="h-4 w-4" />
           </button>
-          <h2 className="text-lg font-semibold text-slate-900">
+          <h2 className="text-base font-semibold text-slate-900">
             {MONTHS[month - 1]} {year}
           </h2>
-          <button type="button" onClick={() => onMonthChange?.(new Date(year, month, 1))} className="rounded-md p-2 text-slate-600 hover:bg-slate-100">
-            <ChevronRight className="h-5 w-5" />
+          <button type="button" onClick={() => onMonthChange?.(new Date(year, month, 1))} className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100">
+            <ChevronRight className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => onMonthChange?.(new Date())} className="rounded border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <button type="button" onClick={() => onMonthChange?.(new Date())} className="rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">
             Hoje
           </button>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-4 w-4 rounded border border-blue-200 bg-blue-50" />
-            <span className="text-slate-600">Sem agendamento</span>
+        <div className="flex flex-wrap items-center gap-3 text-[11px]">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded border border-blue-200 bg-blue-50" />
+            <span className="text-slate-600">Sem agend.</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-4 w-4 rounded border border-amber-200 bg-amber-50" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded border border-amber-200 bg-amber-50" />
             <span className="text-slate-600">Pendente</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-4 w-4 rounded border border-green-200 bg-green-50" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded border border-green-200 bg-green-50" />
             <span className="text-slate-600">Concluído</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-4 w-4 rounded border border-red-200 bg-red-50" />
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-3 w-3 rounded border border-red-200 bg-red-50" />
             <span className="text-slate-600">Atrasado</span>
           </div>
           <span className="text-slate-300">|</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
-            <span className="text-slate-600">&lt; 50%</span>
+            <span className="text-slate-600">&lt;50%</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
             <span className="text-slate-600">50–90%</span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
-            <span className="text-slate-600">&ge; 90%</span>
+            <span className="text-slate-600">&ge;90%</span>
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 overflow-auto">
+      <div className="rounded-lg border border-slate-200 bg-white p-2 overflow-auto">
         {onMoveSchedule ? (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             {content}
@@ -593,30 +602,27 @@ export function AdvancedMonthlyCalendar({
       </div>
 
       {indicators.length > 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-slate-900 mb-3">Resumo do Mês</h3>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <div className="text-slate-500">Total Agendado</div>
-              <div className="text-lg font-semibold text-slate-900">
-                {indicators.reduce((sum, ind) => sum + ind.scheduledHours, 0).toFixed(1)} horas
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500">Total Disponível</div>
-              <div className="text-lg font-semibold text-slate-900">
-                {indicators.reduce((sum, ind) => sum + ind.availableHours, 0).toFixed(1)} horas
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500">Utilização Média</div>
-              <div className="text-lg font-semibold text-slate-900">
-                {indicators.length > 0
-                  ? (indicators.reduce((sum, ind) => sum + ind.utilization, 0) / indicators.length).toFixed(1)
-                  : 0}
-                %
-              </div>
-            </div>
+        <div className="flex items-center gap-6 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm">
+          <span className="font-semibold text-slate-700">Resumo:</span>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500">Agendado</span>
+            <span className="font-semibold text-slate-900">
+              {indicators.reduce((sum, ind) => sum + ind.scheduledHours, 0).toFixed(1)}h
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500">Disponível</span>
+            <span className="font-semibold text-slate-900">
+              {indicators.reduce((sum, ind) => sum + ind.availableHours, 0).toFixed(1)}h
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500">Utilização</span>
+            <span className="font-semibold text-slate-900">
+              {indicators.length > 0
+                ? (indicators.reduce((sum, ind) => sum + ind.utilization, 0) / indicators.length).toFixed(1)
+                : 0}%
+            </span>
           </div>
         </div>
       )}
@@ -649,7 +655,7 @@ function MonthDayDroppable({
       onClick={onClick}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClick()}
       className={cn(
-        "flex min-h-[120px] flex-col rounded-lg border-2 px-1 py-1 text-left transition-all overflow-hidden",
+        "flex min-h-[80px] flex-col rounded-lg border-2 px-2 py-1.5 text-left transition-all overflow-hidden",
         "hover:shadow-md cursor-pointer",
         colorClass,
         isToday && "ring-2 ring-primary ring-offset-2",

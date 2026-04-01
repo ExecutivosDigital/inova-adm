@@ -50,10 +50,20 @@ export interface CompanySchedule {
 
 export type PlanningBalanceMode = "by_os_count" | "by_hours";
 
+export interface AutoGenerateFilters {
+  periodIds?: string[];
+  priorityIds?: string[];
+  teamIds?: string[];
+  serviceModelIds?: string[];
+  sectorIds?: string[];
+  equipmentTypeIds?: string[];
+}
+
 export interface AutoGenerateOptions {
   startDate: string; // ISO date
   endDate: string; // ISO date
   serviceIds?: string[];
   routeIds?: string[];
   balanceMode: PlanningBalanceMode;
+  filters?: AutoGenerateFilters;
 }

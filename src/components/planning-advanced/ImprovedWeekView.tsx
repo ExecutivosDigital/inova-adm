@@ -337,7 +337,7 @@ function DayColumn({
       {/* Cabeçalho do dia */}
       <div
         className={cn(
-          "border-b p-3",
+          "border-b px-2 py-2",
           isToday ? "border-primary/20 bg-primary/5" : "border-slate-200",
         )}
       >
@@ -374,7 +374,7 @@ function DayColumn({
               </div>
               <div className="flex items-center gap-1.5">
                 {isWorkDay && sortedSchedules.length > 0 && (
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-xs text-slate-400">
                     {sortedSchedules.length} agend.
                   </span>
                 )}
@@ -392,7 +392,7 @@ function DayColumn({
                             dotColor,
                           )}
                         />
-                        <span className="text-[10px] text-slate-500 tabular-nums">
+                        <span className="text-xs text-slate-500 tabular-nums">
                           {pct}%
                         </span>
                       </button>
@@ -494,7 +494,7 @@ function DayColumn({
       </div>
 
       {/* Lista de agendamentos */}
-      <div className="flex min-h-0 flex-1 flex-col space-y-2 overflow-y-auto p-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1.5">
         {!isWorkDay ? (
           <p className="py-4 text-center text-xs text-slate-400">
             Não é dia útil
@@ -577,7 +577,7 @@ function DayColumn({
                   );
                   onAddSchedule("route", dateKey, startMin);
                 }}
-                className="hover:border-primary hover:bg-primary/5 hover:text-primary mt-2 flex shrink-0 items-center justify-center gap-1 rounded border border-dashed border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 transition-colors"
+                className="hover:border-primary hover:bg-primary/5 hover:text-primary mt-1 flex shrink-0 items-center justify-center gap-1 rounded border border-dashed border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Adicionar agendamento
@@ -632,92 +632,113 @@ function ReadOnlyScheduleCard({
 
     return (
       <div
-        className={cn("rounded-lg border p-2.5", classes.border, classes.bg)}
+        className={cn(
+          "rounded-md border px-2 py-1.5",
+          classes.border,
+          classes.bg,
+        )}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-slate-900">
-              {woCode ? `OS ${woCode}` : "OS emitida"}
-            </p>
-            <p className="mt-0.5 truncate text-[10px] text-slate-600">
-              {displayName}
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
-              <span>{timeStr}</span>
-              <span>•</span>
-              <span>{formatDuration(schedule.duration)}</span>
-              <span>•</span>
-              <span className={cn("font-medium", classes.text)}>
-                {statusLabel}
-              </span>
-            </div>
-          </div>
-          {onViewWorkOrders && (
-            <button
-              type="button"
-              onClick={() => onViewWorkOrders(workOrders)}
-              title="Ver ordens de serviço"
-              className="shrink-0 rounded border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
-            >
-              <FileText className="h-3.5 w-3.5" />
-            </button>
+        <div className="flex items-center gap-2">
+          {isRoute ? (
+            <RouteIcon className="text-primary h-4 w-4 shrink-0" />
+          ) : (
+            <Wrench className="text-primary h-4 w-4 shrink-0" />
           )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-slate-900">
+              {woCode ? `OS ${woCode}` : "OS emitida"}
+              <span className="font-normal text-slate-600">
+                {" "}
+                · {displayName}
+              </span>
+            </p>
+            <p className="truncate text-xs text-slate-500">
+              {timeStr} · {formatDuration(schedule.duration)}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end justify-center gap-1">
+            <span
+              className={cn(
+                "max-w-[7rem] truncate rounded border px-1.5 py-0.5 text-center text-xs leading-tight font-medium",
+                classes.bg,
+                classes.text,
+                classes.border,
+              )}
+              title={statusLabel}
+            >
+              {statusLabel}
+            </span>
+            {onViewWorkOrders && (
+              <button
+                type="button"
+                onClick={() => onViewWorkOrders(workOrders)}
+                title="Ver ordens de serviço"
+                className="rounded border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-50"
+              >
+                <FileText className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
+  const variant = getScheduleCardVariant(schedule, workOrders);
+  const cardStyles = SCHEDULE_CARD_STYLES[variant];
+  const showOverdueBadge = variant === "overdue";
+
   return (
-    <div className="border-primary/40 bg-primary/10 rounded-lg border p-2.5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-start gap-2">
-          {isRoute ? (
-            <RouteIcon className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <Wrench className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-slate-900">
-              {displayName}
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-              <span>{timeStr}</span>
-              <span>•</span>
-              <span>{formatDuration(schedule.duration)}</span>
-              {workOrders.length > 0 &&
-                (() => {
-                  const variant =
-                    getSummaryVariantForWorkOrders(workOrders) ?? "warning";
-                  const classes = WORK_ORDER_VARIANT_CLASSES[variant];
-                  return (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium",
-                        classes.bg,
-                        classes.text,
-                        classes.border,
-                      )}
-                      title="Ordem(ns) de serviço"
-                    >
-                      <CheckCircle2 className="h-2.5 w-2.5" />
-                      Emitida
-                    </span>
-                  );
-                })()}
-            </div>
-          </div>
-        </div>
-        {onProgramar && (
-          <button
-            type="button"
-            onClick={() => onProgramar(schedule)}
-            title="Programar"
-            className="border-primary text-primary hover:bg-primary/5 shrink-0 rounded border bg-white p-1.5"
-          >
-            <CalendarPlus className="h-3.5 w-3.5" />
-          </button>
+    <div
+      className={cn(
+        "rounded-md border px-2 py-1.5",
+        cardStyles.border,
+        cardStyles.bg,
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {isRoute ? (
+          <RouteIcon className="text-primary h-4 w-4 shrink-0" />
+        ) : (
+          <Wrench className="text-primary h-4 w-4 shrink-0" />
         )}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+          <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+            {timeStr}
+          </span>
+          <span className="shrink-0 text-slate-300">·</span>
+          <span className="shrink-0 text-xs text-slate-500">
+            {formatDuration(schedule.duration)}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {showOverdueBadge && (
+            <span
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+                cardStyles.badgeBorder,
+                cardStyles.badgeBg,
+                cardStyles.badgeText,
+              )}
+            >
+              Atrasado
+            </span>
+          )}
+          {onProgramar && (
+            <button
+              type="button"
+              onClick={() => onProgramar(schedule)}
+              title="Programar"
+              className="border-primary text-primary hover:bg-primary/5 shrink-0 rounded border bg-white p-1"
+            >
+              <CalendarPlus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
+      <p className="mt-0.5 truncate pl-6 text-sm font-medium text-slate-900">
+        {displayName}
+      </p>
     </div>
   );
 }
@@ -821,12 +842,17 @@ function DraggableScheduleCard({
     ? CSS.Translate.toString(transform)
     : undefined;
 
+  const woCode = workOrders[0]?.code
+    ? String(workOrders[0].code).padStart(8, "0")
+    : null;
+  const showOverdueBadge = variant === "overdue" && !hasWO;
+
   return (
     <div
       ref={setNodeRef}
       style={{ transform: cssTransform }}
       className={cn(
-        "group rounded-lg border p-2.5 transition-all",
+        "group rounded-md border px-2 py-1.5 transition-all",
         styles.border,
         styles.bg,
         locked
@@ -838,64 +864,69 @@ function DraggableScheduleCard({
       {...(locked ? {} : listeners)}
       {...(locked ? {} : attributes)}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-start gap-2">
-          {isRoute ? (
-            <RouteIcon className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
-          ) : (
-            <Wrench className="text-primary mt-0.5 h-3.5 w-3.5 shrink-0" />
+      {/* Row 1: icon + time/duration + badges */}
+      <div className="flex items-center gap-2">
+        {isRoute ? (
+          <RouteIcon className="text-primary h-4 w-4 shrink-0" />
+        ) : (
+          <Wrench className="text-primary h-4 w-4 shrink-0" />
+        )}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+          <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+            {timeStr}
+          </span>
+          <span className="shrink-0 text-slate-300">·</span>
+          <span className="shrink-0 text-xs text-slate-500">
+            {formatDuration(schedule.duration)}
+          </span>
+          {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
+            <>
+              <span className="shrink-0 text-slate-300">·</span>
+              <span
+                className="text-primary shrink-0 text-xs"
+                title="Colaboradores atribuídos"
+              >
+                {schedule.assignedWorkerIds!.length} col.
+              </span>
+            </>
           )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className="truncate text-xs font-medium text-slate-900">
-                {displayName}
-              </p>
-              {hasWO &&
-                (() => {
-                  const woCode = workOrders[0]?.code
-                    ? String(workOrders[0].code).padStart(8, "0")
-                    : null;
-                  return (
-                    <span
-                      className={cn(
-                        "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium",
-                        styles.badgeBorder,
-                        styles.badgeBg,
-                        styles.badgeText,
-                      )}
-                    >
-                      <CheckCircle2 className="h-2.5 w-2.5" />
-                      {woCode ? `OS ${woCode}` : "OS"}
-                    </span>
-                  );
-                })()}
-              {variant === "overdue" && !hasWO && (
-                <span
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5 text-[10px] font-medium",
-                    styles.badgeBorder,
-                    styles.badgeBg,
-                    styles.badgeText,
-                  )}
-                >
-                  Atrasado
-                </span>
-              )}
-            </div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-              <span>{timeStr}</span>
-              <span>•</span>
-              <span>{formatDuration(schedule.duration)}</span>
-              {(schedule.assignedWorkerIds?.length ?? 0) > 0 && (
-                <span className="text-primary" title="Colaboradores atribuídos">
-                  · {schedule.assignedWorkerIds!.length} colaborador(es)
-                </span>
-              )}
-            </div>
-          </div>
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {hasWO && (
+            <span
+              className={cn(
+                "flex items-center gap-0.5 truncate rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+                styles.badgeBorder,
+                styles.badgeBg,
+                styles.badgeText,
+              )}
+              title={woCode ? `OS ${woCode}` : "OS emitida"}
+            >
+              <CheckCircle2 className="h-3 w-3 shrink-0" />
+              <span className="truncate">{woCode ? `OS ${woCode}` : "OS"}</span>
+            </span>
+          )}
+          {showOverdueBadge && (
+            <span
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-xs leading-tight font-medium",
+                styles.badgeBorder,
+                styles.badgeBg,
+                styles.badgeText,
+              )}
+            >
+              Atrasado
+            </span>
+          )}
+        </div>
+      </div>
+      {/* Row 2: name + action buttons */}
+      <div className="mt-0.5 flex items-center gap-1 pl-6">
+        <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">
+          {displayName}
+        </p>
         {!locked && (
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0 opacity-0 transition-opacity group-hover:opacity-100">
             {onAssignWorkers && (
               <button
                 type="button"
@@ -904,10 +935,10 @@ function DraggableScheduleCard({
                   e.stopPropagation();
                   onAssignWorkers();
                 }}
-                className="hover:text-primary rounded p-1 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-100"
+                className="hover:text-primary rounded p-1 text-slate-400 hover:bg-slate-100"
                 title="Atribuir colaboradores"
               >
-                <Users className="h-3.5 w-3.5" />
+                <Users className="h-4 w-4" />
               </button>
             )}
             <button
@@ -917,10 +948,10 @@ function DraggableScheduleCard({
                 e.stopPropagation();
                 onRemove();
               }}
-              className="shrink-0 rounded p-1 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-100 hover:text-red-600"
+              className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-600"
               title="Remover"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         )}
