@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useAdminProfile } from "@/hooks/useAdminProfile";
 import { cn } from "@/lib/utils";
 import {
+  AlertTriangle,
   CalendarDays,
   ChevronLeft,
   Lock,
@@ -29,6 +30,12 @@ const menuItems = [
     icon: CalendarDays,
     label: "Programação",
     href: "/programacao",
+    enabled: true,
+  },
+  {
+    icon: AlertTriangle,
+    label: "Anomalias",
+    href: "/anomalias",
     enabled: true,
   },
 ];

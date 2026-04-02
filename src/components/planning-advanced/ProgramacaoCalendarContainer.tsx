@@ -567,29 +567,34 @@ export function ProgramacaoCalendarContainer() {
       }
       setEmitting(true);
       try {
-        for (const schedule of routeSchedulesInRange) {
-          const res = await apiContext.PostAPI(
-            "/work-order/route",
-            {
-              routeId: schedule.routeId,
-              scheduledAt: schedule.scheduledStartAt,
-              visibilityMode: (schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role",
-              ...((schedule.assignedWorkerIds?.length ?? 0) > 0 ? { workerIds: schedule.assignedWorkerIds } : {}),
-            },
-            true
+        // Emitir rotas e serviços em paralelo usando endpoints batch
+        const promises: Promise<{ status: number; body: unknown }>[] = [];
+
+        if (routeSchedulesInRange.length > 0) {
+          const routePayloads = routeSchedulesInRange.map((schedule) => ({
+            routeId: schedule.routeId!,
+            scheduledAt: schedule.scheduledStartAt,
+            visibilityMode: ((schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role") as "all_with_team_role" | "assigned_workers",
+            ...((schedule.assignedWorkerIds?.length ?? 0) > 0 ? { workerIds: schedule.assignedWorkerIds } : {}),
+          }));
+          promises.push(
+            apiContext.PostAPI("/work-order/route/multi", { routes: routePayloads }, true)
           );
-          if (res.status !== 200 && res.status !== 201) {
-            toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordem de serviço.");
-            return;
-          }
         }
+
         if (servicePayloads.length > 0) {
-          const res = await apiContext.PostAPI("/work-order/multi", { workOrders: servicePayloads }, true);
-          if (res.status !== 200 && res.status !== 201) {
-            toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordens de serviço.");
-            return;
-          }
+          promises.push(
+            apiContext.PostAPI("/work-order/multi", { workOrders: servicePayloads }, true)
+          );
         }
+
+        const results = await Promise.all(promises);
+        const failed = results.find((r) => r.status !== 200 && r.status !== 201);
+        if (failed) {
+          toast.error((failed.body as { message?: string })?.message ?? "Erro ao emitir ordens de serviço.");
+          return;
+        }
+
         setShowBulkModal(false);
         toast.success(`${total} ordem(ns) de serviço emitida(s).`);
         fetchData();
