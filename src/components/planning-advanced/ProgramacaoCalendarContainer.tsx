@@ -277,11 +277,12 @@ export function ProgramacaoCalendarContainer() {
   );
 
   const scheduleItems = useMemo(() => {
-    return schedules.map((schedule) => {
+    const items = schedules.map((schedule) => {
       const raw = schedule as { assignedWorkerIds?: string[]; assignedWorkers?: Array<{ id: string; name: string }> };
       const base = {
         assignedWorkerIds: raw.assignedWorkerIds ?? [],
         assignedWorkers: raw.assignedWorkers ?? [],
+        splitGroupId: schedule.splitGroupId ?? null,
       };
       if (schedule.type === "route") {
         const route = routes.find((r) => r.id === schedule.routeId);
@@ -300,12 +301,15 @@ export function ProgramacaoCalendarContainer() {
       } else {
         const service = services.find((s) => s.id === schedule.cipServiceId);
         const cip = service ?? schedule.cipService;
+        const fullDuration = cip?.executionTime?.minutes || 60;
+        // Usar durationMinutes do schedule (parcial, se split) quando disponível
+        const duration = schedule.durationMinutes ?? fullDuration;
         return {
           id: schedule.id,
           type: "service" as const,
           serviceId: schedule.cipServiceId,
           scheduledStartAt: schedule.scheduledStartAt,
-          duration: cip?.executionTime?.minutes || 60,
+          duration,
           ...base,
           service: cip
             ? {
@@ -315,13 +319,32 @@ export function ProgramacaoCalendarContainer() {
                   cip.cip?.subset?.set?.equipment?.name ||
                   cip.cip?.subset?.set?.equipment?.tag ||
                   "Equipamento",
-                duration: cip.executionTime?.minutes || 60,
+                duration: fullDuration,
                 periodDays: cip.period?.days || undefined,
               }
             : undefined,
         };
       }
     });
+
+    // Computar splitPartIndex e splitTotalParts para schedules multi-dia
+    const splitGroupMap = new Map<string, typeof items>();
+    for (const item of items) {
+      if (item.splitGroupId) {
+        const list = splitGroupMap.get(item.splitGroupId) ?? [];
+        list.push(item);
+        splitGroupMap.set(item.splitGroupId, list);
+      }
+    }
+    for (const [, group] of splitGroupMap) {
+      group.sort((a, b) => a.scheduledStartAt.localeCompare(b.scheduledStartAt));
+      group.forEach((item, idx) => {
+        item.splitPartIndex = idx + 1;
+        item.splitTotalParts = group.length;
+      });
+    }
+
+    return items;
   }, [schedules, routes, services]);
 
   const activeFiltersCount = useMemo(() => {
@@ -517,10 +540,17 @@ export function ProgramacaoCalendarContainer() {
         visibilityMode: "all_with_team_role" | "assigned_workers";
         workerIds?: string[];
       }> = [];
+      // Dedup: para schedules com splitGroupId, emitir apenas 1 WO por grupo (a parte mais cedo)
+      const seenSplitGroups = new Set<string>();
       for (const schedule of scheduleItems) {
         const t = new Date(schedule.scheduledStartAt).getTime();
         if (t < start || t > end) continue;
         if (scheduleIdsWithOS.has(schedule.id)) continue;
+        // Pular partes 2+ do mesmo split group (scheduleItems já ordenado por scheduledStartAt)
+        if (schedule.splitGroupId) {
+          if (seenSplitGroups.has(schedule.splitGroupId)) continue;
+          seenSplitGroups.add(schedule.splitGroupId);
+        }
         const visibilityMode = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role";
         const workerIds = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? schedule.assignedWorkerIds : undefined;
         if (schedule.type === "route" && schedule.routeId && scheduleHasWorkOrder(schedule, routeCipServices)) {

@@ -245,14 +245,16 @@ export function AdvancedDayView({
   const SLOT_MINUTES = 30;
   const ROW_HEIGHT_PX = 56;
 
-  type SchedulePosition = {
+  type ScheduleFragment = {
     schedule: ScheduleItem;
     startSlotIndex: number;
     durationSlots: number;
     lane: number;
+    fragmentIndex: number;
+    totalFragments: number;
   };
 
-  const schedulePositions: SchedulePosition[] = [];
+  const schedulePositions: ScheduleFragment[] = [];
   const laneEndSlot: number[] = [];
 
   sortedSchedules.forEach((schedule) => {
@@ -263,32 +265,55 @@ export function AdvancedDayView({
       0,
       Math.floor((scheduleStartMinutes - startMin) / SLOT_MINUTES),
     );
-    // Calcular slots necessários pulando horário de almoço
+
+    // Gerar fragmentos visuais: quebrar no almoço
+    const fragments: { start: number; end: number }[] = [];
     let remainingMin = schedule.duration;
-    let slotsNeeded = 0;
+    let rangeStart = startSlotIndex;
+    let inLunch = false;
+
     for (let i = startSlotIndex; i < slots.length && remainingMin > 0; i++) {
-      slotsNeeded++;
-      if (!slots[i].isLunch) {
+      if (slots[i].isLunch) {
+        if (!inLunch && i > rangeStart) {
+          fragments.push({ start: rangeStart, end: i });
+        }
+        inLunch = true;
+      } else {
+        if (inLunch) {
+          rangeStart = i;
+          inLunch = false;
+        }
         remainingMin -= SLOT_MINUTES;
       }
     }
-    const durationSlots = Math.max(1, slotsNeeded);
-    const endSlotIndex = Math.min(startSlotIndex + durationSlots, slots.length);
-    const actualDurationSlots = endSlotIndex - startSlotIndex;
+    // Fechar último fragmento
+    const lastWorkSlot = rangeStart + Math.max(1, Math.ceil((schedule.duration - (fragments.reduce((s, f) => s + (f.end - f.start), 0) * SLOT_MINUTES)) / SLOT_MINUTES));
+    const finalEnd = Math.min(inLunch ? rangeStart : lastWorkSlot, slots.length);
+    if (!inLunch && finalEnd > rangeStart) {
+      fragments.push({ start: rangeStart, end: finalEnd });
+    }
 
-    // Atribuir lane: preferir lane salva (scheduleLanes) se estiver livre; senão usar nova lane para não empilhar
+    // Se nenhum fragmento foi gerado, criar ao menos 1
+    if (fragments.length === 0) {
+      fragments.push({ start: startSlotIndex, end: Math.min(startSlotIndex + 1, slots.length) });
+    }
+
+    // Calcular span total (incluindo gap de almoço) para lane assignment
+    const totalStart = fragments[0].start;
+    const totalEnd = fragments[fragments.length - 1].end;
+
+    // Atribuir lane
     const preferredLane = scheduleLanes?.[schedule.id];
     let lane = -1;
     if (
       preferredLane != null &&
       preferredLane >= 0 &&
       (laneEndSlot[preferredLane] === undefined ||
-        laneEndSlot[preferredLane] <= startSlotIndex)
+        laneEndSlot[preferredLane] <= totalStart)
     ) {
       lane = preferredLane;
     }
     if (lane < 0) {
-      // Usar nova lane (cada agendamento na sua coluna) para evitar empilhar e dar largura total
       lane = laneEndSlot.length;
       laneEndSlot.push(0);
     } else {
@@ -296,13 +321,18 @@ export function AdvancedDayView({
         while (laneEndSlot.length <= lane) laneEndSlot.push(0);
       }
     }
-    laneEndSlot[lane] = endSlotIndex;
+    laneEndSlot[lane] = totalEnd;
 
-    schedulePositions.push({
-      schedule,
-      startSlotIndex,
-      durationSlots: actualDurationSlots,
-      lane,
+    const totalFragments = fragments.length;
+    fragments.forEach((frag, fragIdx) => {
+      schedulePositions.push({
+        schedule,
+        startSlotIndex: frag.start,
+        durationSlots: frag.end - frag.start,
+        lane,
+        fragmentIndex: fragIdx,
+        totalFragments,
+      });
     });
   });
 
@@ -534,9 +564,9 @@ export function AdvancedDayView({
               ))}
               {/* Área de conteúdo: cards posicionados (cada um na sua coluna) */}
               {schedulePositions.map(
-                ({ schedule, startSlotIndex, durationSlots, lane }) => (
+                ({ schedule, startSlotIndex, durationSlots, lane, fragmentIndex, totalFragments }) => (
                   <div
-                    key={schedule.id}
+                    key={`${schedule.id}-f${fragmentIndex}`}
                     className="min-h-0 min-w-0 overflow-hidden px-0.5 py-0"
                     style={{
                       gridRow: `${startSlotIndex + 1} / span ${durationSlots}`,
@@ -546,9 +576,11 @@ export function AdvancedDayView({
                   >
                     <ReadOnlyScheduleCard
                       schedule={schedule}
-                      onProgramar={onProgramar}
-                      workOrders={workOrdersForSchedule?.(schedule) ?? []}
+                      onProgramar={fragmentIndex === 0 ? onProgramar : undefined}
+                      workOrders={fragmentIndex === 0 ? (workOrdersForSchedule?.(schedule) ?? []) : []}
                       onViewWorkOrders={onViewWorkOrders}
+                      fragmentIndex={fragmentIndex}
+                      totalFragments={totalFragments}
                     />
                   </div>
                 ),
@@ -628,9 +660,9 @@ export function AdvancedDayView({
                 ))}
                 {/* Cards de agendamento (ocupam N linhas conforme duração) */}
                 {schedulePositions.map(
-                  ({ schedule, startSlotIndex, durationSlots, lane }) => (
+                  ({ schedule, startSlotIndex, durationSlots, lane, fragmentIndex, totalFragments }) => (
                     <div
-                      key={schedule.id}
+                      key={`${schedule.id}-f${fragmentIndex}`}
                       className="min-h-0 min-w-0 overflow-hidden px-0.5 py-0"
                       style={{
                         gridRow: `${startSlotIndex + 1} / span ${durationSlots}`,
@@ -642,13 +674,15 @@ export function AdvancedDayView({
                         schedule={schedule}
                         laneIndex={lane}
                         movingScheduleId={movingScheduleId}
-                        onRemove={() => onRemoveSchedule(schedule.id)}
+                        onRemove={fragmentIndex === 0 ? () => onRemoveSchedule(schedule.id) : () => {}}
                         onAssignWorkers={
-                          onAssignWorkers
+                          fragmentIndex === 0 && onAssignWorkers
                             ? () => onAssignWorkers(schedule)
                             : undefined
                         }
-                        workOrders={workOrdersForSchedule?.(schedule) ?? []}
+                        workOrders={fragmentIndex === 0 ? (workOrdersForSchedule?.(schedule) ?? []) : []}
+                        fragmentIndex={fragmentIndex}
+                        totalFragments={totalFragments}
                       />
                     </div>
                   ),
@@ -674,16 +708,25 @@ function ReadOnlyScheduleCard({
   onProgramar,
   workOrders = [],
   onViewWorkOrders,
+  fragmentIndex = 0,
+  totalFragments = 1,
 }: {
   schedule: ScheduleItem;
   onProgramar?: (schedule: ScheduleItem) => void;
   workOrders?: WorkOrderSummary[];
   onViewWorkOrders?: (workOrders: WorkOrderSummary[]) => void;
+  fragmentIndex?: number;
+  totalFragments?: number;
 }) {
   const isRoute = schedule.type === "route";
-  const displayName = isRoute
+  const baseName = isRoute
     ? `${schedule.route?.code} – ${schedule.route?.name}`
     : `${schedule.service?.name} (${schedule.service?.equipmentName})`;
+  const partLabel = (schedule.splitTotalParts ?? 0) > 1
+    ? ` (Parte ${schedule.splitPartIndex}/${schedule.splitTotalParts})`
+    : "";
+  const fragLabel = totalFragments > 1 ? ` [${fragmentIndex + 1}/${totalFragments}]` : "";
+  const displayName = baseName + partLabel + fragLabel;
   const hasWorkOrders = workOrders.length > 0;
 
   if (hasWorkOrders) {
@@ -910,6 +953,8 @@ function DraggableScheduleCard({
   onRemove,
   onAssignWorkers,
   workOrders = [],
+  fragmentIndex = 0,
+  totalFragments = 1,
 }: {
   schedule: ScheduleItem;
   laneIndex?: number;
@@ -917,11 +962,18 @@ function DraggableScheduleCard({
   onRemove: () => void;
   onAssignWorkers?: () => void;
   workOrders?: WorkOrderSummary[];
+  fragmentIndex?: number;
+  totalFragments?: number;
 }) {
   const isRoute = schedule.type === "route";
-  const displayName = isRoute
+  const baseName = isRoute
     ? `${schedule.route?.code} – ${schedule.route?.name}`
     : `${schedule.service?.name} (${schedule.service?.equipmentName})`;
+  const partLabel = (schedule.splitTotalParts ?? 0) > 1
+    ? ` (Parte ${schedule.splitPartIndex}/${schedule.splitTotalParts})`
+    : "";
+  const fragLabel = totalFragments > 1 ? ` [${fragmentIndex + 1}/${totalFragments}]` : "";
+  const displayName = baseName + partLabel + fragLabel;
   const hasWO = workOrders.length > 0;
   const variant = getScheduleCardVariant(schedule, workOrders);
   const styles = SCHEDULE_CARD_STYLES[variant];

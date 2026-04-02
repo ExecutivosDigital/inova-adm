@@ -773,17 +773,22 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
         await fetchData();
         setShowShiftPeriodModal(false);
         if (res.status === 200 && res.body) {
-          const { moved, skippedWithOS, conflictsInDestination } = res.body as {
+          const { moved, skippedWithOS, cascaded, blockedByOS, cascadeLimitReached } = res.body as {
             moved: number;
             skippedWithOS: number;
-            conflictsInDestination: number;
+            cascaded: number;
+            blockedByOS: number;
+            cascadeLimitReached: number;
           };
           const parts: string[] = [];
           if (moved > 0) parts.push(`${moved} agendamento(s) movido(s)`);
+          if (cascaded > 0) parts.push(`${cascaded} empurrado(s) em cascata`);
           if (skippedWithOS > 0) parts.push(`${skippedWithOS} ignorado(s) (OS emitida)`);
-          if (conflictsInDestination > 0) parts.push(`${conflictsInDestination} conflito(s) no destino (ajustados)`);
+          if (blockedByOS > 0) parts.push(`${blockedByOS} bloqueado(s) por OS no destino`);
+          if (cascadeLimitReached > 0) parts.push(`${cascadeLimitReached} excederam limite de cascata`);
+          const hasWarnings = skippedWithOS > 0 || blockedByOS > 0 || cascadeLimitReached > 0;
           if (parts.length > 0) {
-            if (skippedWithOS > 0 || conflictsInDestination > 0) {
+            if (hasWarnings) {
               toast(parts.join(". ") + ".", { icon: "⚠️" });
             } else {
               toast.success(parts.join(". ") + ".");

@@ -30,6 +30,12 @@ export interface ScheduleItem {
   /** IDs dos workers vinculados (definidos na etapa de planejamento) */
   assignedWorkerIds?: string[];
   assignedWorkers?: Array<{ id: string; name: string }>;
+  /** Identificador do grupo de split (schedules multi-dia compartilham o mesmo valor) */
+  splitGroupId?: string | null;
+  /** Índice da parte dentro do split group (1-based). Ex: 1 de 2 */
+  splitPartIndex?: number;
+  /** Total de partes no split group */
+  splitTotalParts?: number;
 }
 
 export interface WorkloadIndicator {

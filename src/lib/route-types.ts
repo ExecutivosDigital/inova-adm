@@ -137,6 +137,7 @@ export interface RouteScheduleItem {
   route?: { id: string; name: string; code: string; companyId: string };
   /** Soma dos minutos de execução dos serviços da rota (enviado pela API). */
   durationMinutes?: number;
+  splitGroupId?: string | null;
   assignedWorkerIds?: string[];
   assignedWorkers?: Array<{ id: string; name: string }>;
 }
@@ -147,6 +148,7 @@ export interface ServiceScheduleItem {
   cipServiceId: string;
   scheduledStartAt: string;
   durationMinutes?: number;
+  splitGroupId?: string | null;
   assignedWorkerIds?: string[];
   assignedWorkers?: Array<{ id: string; name: string }>;
   cipService?: CipService & {

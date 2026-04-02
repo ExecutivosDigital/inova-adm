@@ -130,6 +130,12 @@ export function ShiftPeriodModal({
                   </span>
                 </label>
               </div>
+
+              {direction === "forward" && (
+                <p className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-md p-2">
+                  Agendamentos existentes no destino para os mesmos serviços/rotas serão empurrados automaticamente (efeito cascata).
+                </p>
+              )}
             </fieldset>
 
             <div>
