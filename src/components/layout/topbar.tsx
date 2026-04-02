@@ -20,11 +20,35 @@ import { Building2, Loader2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import React from "react";
 
+/** Mapa de slugs de rota → label amigável para o breadcrumb */
+const ROUTE_LABELS: Record<string, string> = {
+  equipamentos: "Equipamentos",
+  planejamento: "Planejamento",
+  programacao: "Programação",
+  configuracoes: "Configurações",
+  materiais: "Materiais",
+  "ordens-servico": "Ordens de Serviço",
+};
+
+/** Detecta se o segmento é um UUID (v4) */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function generateBreadcrumbs(pathname: string) {
   const paths = pathname.split("/").filter((x) => x);
   const breadcrumbs = paths.map((path, index) => {
     const href = `/${paths.slice(0, index + 1).join("/")}`;
-    const label = path.charAt(0).toUpperCase() + path.slice(1);
+    let label: string;
+
+    if (ROUTE_LABELS[path]) {
+      label = ROUTE_LABELS[path];
+    } else if (UUID_RE.test(path)) {
+      // UUIDs serão substituídos depois pelo componente (via prop ou contexto)
+      label = "Detalhes";
+    } else {
+      label = path.charAt(0).toUpperCase() + path.slice(1);
+    }
+
     return { href, label };
   });
 

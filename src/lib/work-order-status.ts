@@ -3,27 +3,37 @@
  * Verde: executado no prazo | Laranja: pendente | Vermelho: atrasado/recusado
  */
 
-export type WorkOrderStatusVariant = "success" | "warning" | "danger";
+export type WorkOrderStatusVariant =
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "purple"
+  | "slate";
 
 export const WORK_ORDER_STATUS_LABELS: Record<string, string> = {
   pending: "Pendente",
   scheduled: "Agendada",
   in_progress: "Em andamento",
-  emitted: "Emitido",
+  emitted: "Emitida",
   completed: "Concluída",
   cancelled: "Cancelada",
-  refused: "Recusado",
-  overdue: "Atrasado",
+  refused: "Recusada",
+  overdue: "Atrasada",
+  paused: "Pausada",
+  started: "Iniciada",
 };
 
-/** Variante de cor por status: success = verde, warning = laranja, danger = vermelho */
+/** Variante de cor por status */
 export const WORK_ORDER_STATUS_VARIANT: Record<string, WorkOrderStatusVariant> =
   {
     completed: "success",
-    pending: "warning",
-    scheduled: "warning",
-    in_progress: "warning",
+    pending: "slate",
+    scheduled: "purple",
+    in_progress: "info",
     emitted: "warning",
+    started: "info",
+    paused: "warning",
     cancelled: "danger",
     refused: "danger",
     overdue: "danger",
@@ -73,6 +83,21 @@ export const WORK_ORDER_VARIANT_CLASSES: Record<
     text: "text-red-800",
     border: "border-red-200",
   },
+  info: {
+    bg: "bg-blue-100",
+    text: "text-blue-800",
+    border: "border-blue-200",
+  },
+  purple: {
+    bg: "bg-purple-100",
+    text: "text-purple-800",
+    border: "border-purple-200",
+  },
+  slate: {
+    bg: "bg-slate-100",
+    text: "text-slate-700",
+    border: "border-slate-200",
+  },
 };
 
 /** Verifica se todas as OS estão com status "completed". */
@@ -93,12 +118,19 @@ export function hasCompletedWithProblems(
   );
 }
 
-/** Para múltiplas OS: retorna a variante "mais crítica" (danger > warning > success) para exibir no card. */
+/** Para múltiplas OS: retorna a variante "mais crítica" para exibir no card. */
 export function getSummaryVariantForWorkOrders(
   workOrders: Array<{ status: string }>,
 ): WorkOrderStatusVariant | null {
   if (!workOrders.length) return null;
-  const order: WorkOrderStatusVariant[] = ["danger", "warning", "success"];
+  const order: WorkOrderStatusVariant[] = [
+    "danger",
+    "warning",
+    "info",
+    "purple",
+    "slate",
+    "success",
+  ];
   let worst: WorkOrderStatusVariant = "success";
   for (const wo of workOrders) {
     const v = getWorkOrderStatusVariant(wo.status);
