@@ -34,6 +34,7 @@ import type {
     ServiceScheduleItem,
     WorkloadIndicator
 } from "@/lib/route-types";
+import { totalExecutionMinutes } from "@/lib/route-types";
 import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { ArrowLeftRight, ChevronDown, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -107,7 +108,7 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
         fetchSchedules(effectiveCompanyId, apiContext),
         apiContext.GetAPI(`/company/${effectiveCompanyId}`, true),
         apiContext.GetAPI(isSuperAdmin ? `/route?companyId=${effectiveCompanyId}` : "/route", true),
-        apiContext.PostAPI(`/filter-services`, { companyId: effectiveCompanyId }, true),
+        apiContext.PostAPI(`/filter-services`, { companyId: effectiveCompanyId, excludeInPermanentRoutes: true }, true),
         apiContext.GetAPI(`/route/company/${effectiveCompanyId}/route-services`, true),
         apiContext.GetAPI(`/work-order/company/${effectiveCompanyId}`, true),
         apiContext.GetAPI(isSuperAdmin ? `/workers?companyId=${effectiveCompanyId}` : "/workers", true),
@@ -280,13 +281,17 @@ export function PlanningCalendarContainer({}: PlanningCalendarContainerProps) {
 
   // Converter rotas e serviços para o formato esperado pelos componentes
   const planningRoutes = useMemo(() => {
-    return routes.map((route) => ({
-      id: route.id,
-      code: route.code,
-      name: route.name,
-      duration: routeDurationByRouteId.get(route.id) ?? 120,
-    }));
-  }, [routes, routeDurationByRouteId]);
+    return routes.map((route) => {
+      const rcsForRoute = routeCipServices.filter((rcs) => rcs.routeId === route.id);
+      const computedDuration = rcsForRoute.length > 0 ? totalExecutionMinutes(rcsForRoute) : 0;
+      return {
+        id: route.id,
+        code: route.code,
+        name: route.name,
+        duration: computedDuration || (routeDurationByRouteId.get(route.id) ?? 120),
+      };
+    });
+  }, [routes, routeCipServices, routeDurationByRouteId]);
 
   const planningServices = useMemo(() => {
     return services.map((service) => ({

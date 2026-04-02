@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, Route as RouteIcon, Wrench } from "lucide-react";
 import type {
   PlanningRoute,
   PlanningService,
   ScheduleType,
 } from "@/lib/planning-advanced-types";
+import { Loader2, Route as RouteIcon, Wrench } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface AddScheduleModalProps {
   open: boolean;
@@ -14,7 +14,7 @@ interface AddScheduleModalProps {
   onSchedule: (
     type: ScheduleType,
     routeIdOrServiceId: string,
-    scheduledStartAt: string
+    scheduledStartAt: string,
   ) => void;
   routes: PlanningRoute[];
   services: PlanningService[];
@@ -53,47 +53,48 @@ export function AddScheduleModal({
   const [routeId, setRouteId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [dateKey, setDateKey] = useState(
-    defaultDateKey || new Date().toISOString().split("T")[0]
+    defaultDateKey || new Date().toISOString().split("T")[0],
   );
   const [timeStr, setTimeStr] = useState(
-    defaultSlotMin != null ? minutesToTimeStr(defaultSlotMin) : "08:00"
+    defaultSlotMin != null ? minutesToTimeStr(defaultSlotMin) : "08:00",
   );
-  
+
   useEffect(() => {
     if (defaultDateKey) setDateKey(defaultDateKey);
   }, [defaultDateKey]);
-  
+
   useEffect(() => {
     if (defaultSlotMin != null) {
       setTimeStr(minutesToTimeStr(defaultSlotMin));
     }
   }, [defaultSlotMin]);
-  
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const id = type === "route" ? routeId : serviceId;
     if (!id.trim()) return;
-    
+
     const [y, m, d] = dateKey.split("-").map(Number);
     const [h, min] = timeStr.split(":").map(Number);
     const scheduledStartAt = `${dateKey}T${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000-03:00`;
-    
+
     onSchedule(type, id, scheduledStartAt);
   };
-  
+
   const selectedRoute = routes.find((r) => r.id === routeId);
   const selectedService = services.find((s) => s.id === serviceId);
-  const selectedDuration = type === "route" ? selectedRoute?.duration : selectedService?.duration;
-  
+  const selectedDuration =
+    type === "route" ? selectedRoute?.duration : selectedService?.duration;
+
   if (!open) return null;
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-lg">
         <h3 className="mb-4 text-lg font-semibold text-slate-900">
           Agendar no Planejamento
         </h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Tipo de agendamento */}
           <div>
@@ -101,7 +102,7 @@ export function AddScheduleModal({
               Tipo
             </label>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"
                   name="type"
@@ -114,10 +115,10 @@ export function AddScheduleModal({
                   }}
                   className="text-primary"
                 />
-                <RouteIcon className="h-4 w-4 text-primary" />
+                <RouteIcon className="text-primary h-4 w-4" />
                 <span className="text-sm">Rota</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="radio"
                   name="type"
@@ -130,12 +131,12 @@ export function AddScheduleModal({
                   }}
                   className="text-primary"
                 />
-                <Wrench className="h-4 w-4 text-primary" />
+                <Wrench className="text-primary h-4 w-4" />
                 <span className="text-sm">Serviço Individual</span>
               </label>
             </div>
           </div>
-          
+
           {/* Seleção de rota ou serviço */}
           {type === "route" ? (
             <div>
@@ -177,7 +178,7 @@ export function AddScheduleModal({
               </select>
             </div>
           )}
-          
+
           {/* Data */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -191,7 +192,7 @@ export function AddScheduleModal({
               required
             />
           </div>
-          
+
           {/* Horário */}
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -205,7 +206,7 @@ export function AddScheduleModal({
               required
             />
           </div>
-          
+
           {/* Informação de duração */}
           {selectedDuration && selectedDuration > 0 && (
             <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
@@ -216,7 +217,7 @@ export function AddScheduleModal({
               </p>
             </div>
           )}
-          
+
           {/* Botões */}
           <div className="flex justify-end gap-2 pt-2">
             <button
@@ -229,7 +230,7 @@ export function AddScheduleModal({
             <button
               type="submit"
               disabled={loading || !(type === "route" ? routeId : serviceId)}
-              className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-primary hover:bg-primary/90 rounded px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
