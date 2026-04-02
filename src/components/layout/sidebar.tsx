@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import {
   CalendarDays,
   ChevronLeft,
+  ClipboardList,
   Lock,
   LogOut,
   Menu,
@@ -29,6 +30,12 @@ const menuItems = [
     icon: CalendarDays,
     label: "Programação",
     href: "/programacao",
+    enabled: true,
+  },
+  {
+    icon: ClipboardList,
+    label: "Ordens de Serviço",
+    href: "/ordens-servico",
     enabled: true,
   },
 ];

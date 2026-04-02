@@ -87,7 +87,7 @@ export default function EquipmentDetailPage() {
         </TabsContent>
 
         <TabsContent value="history">
-          <HistoryTab />
+          <HistoryTab equipment={equipment} />
         </TabsContent>
       </Tabs>
     </div>

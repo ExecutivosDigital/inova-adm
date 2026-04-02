@@ -22,12 +22,40 @@ export interface EquipmentPhotoFromApi {
   fullUrl: string;
 }
 
+/** Serviço vinculado ao CIP (GET equipment/single com includes) */
+export interface CipServiceFromApi {
+  id: string;
+  cipId: string;
+  serviceModelId: string;
+  periodId?: string | null;
+  priorityId?: string | null;
+  teamId?: string | null;
+  serviceConditionId?: string | null;
+  jobSystemId?: string | null;
+  executionTimeId?: string | null;
+  lastExecutionAt?: string | null;
+  serviceModel?: { id: string; name: string; description?: string | null };
+  period?: { id: string; name: string; days?: number | null };
+  priority?: { id: string; name: string };
+  team?: { id: string; name: string };
+  serviceCondition?: { id: string; name: string };
+  jobSystem?: { id: string; name: string };
+  executionTime?: { id: string; name: string; minutes?: number | null };
+  extraTeam?: { id: string; name: string } | null;
+  estimatedExtraTeamTime?: { id: string; name: string; minutes?: number | null } | null;
+  meter?: { id: string; name: string } | null;
+  serviceProcedure?: { id: string; name: string } | null;
+  serviceReason?: { id: string; name: string } | null;
+  safetyCondition?: { id: string; name: string } | null;
+  toolkit?: { id: string; name: string } | null;
+}
+
 export interface CipFromApi {
   id: string;
   name: string;
   code: string;
   position: string;
-  cipServices?: unknown[];
+  cipServices?: CipServiceFromApi[];
 }
 
 export interface SubsetFromApi {
