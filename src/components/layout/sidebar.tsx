@@ -18,6 +18,7 @@ import {
   LogOut,
   Menu,
   Route,
+  Users,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
@@ -45,6 +46,7 @@ const menuItems = [
     href: "/anomalias",
     enabled: true,
   },
+  { icon: Users, label: "Usuários", href: "/usuarios", enabled: true },
 ];
 
 export function Sidebar() {

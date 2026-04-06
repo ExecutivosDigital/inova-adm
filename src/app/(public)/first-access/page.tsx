@@ -1,12 +1,6 @@
-import LoginForm from "@/components/auth/login-form";
-import { Metadata } from "next";
+import FirstAccessForm from "@/components/auth/first-access-form";
 
-export const metadata: Metadata = {
-  title: "Login | TechLub ADM",
-  description: "Acesse sua conta",
-};
-
-export default function LoginPage() {
+export default function FirstAccessPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left Side - Form */}
@@ -14,21 +8,21 @@ export default function LoginPage() {
         <div className="w-full max-w-md space-y-8">
           <div className="space-y-2 text-center lg:text-left">
             <h1 className="text-foreground text-3xl font-bold tracking-tighter">
-              Bem-vindo de volta
+              Primeiro Acesso
             </h1>
             <p className="text-muted-foreground">
-              Entre com suas credenciais para acessar o painel.
+              Informe a senha temporária recebida e crie uma nova senha.
             </p>
           </div>
-          <LoginForm />
-          <div className="text-muted-foreground text-center text-sm space-y-1">
+          <FirstAccessForm />
+          <div className="text-muted-foreground text-center text-sm">
             <p>
-              Primeiro acesso?{" "}
+              Já possui senha?{" "}
               <a
-                href="/first-access"
+                href="/login"
                 className="hover:text-primary underline transition-colors"
               >
-                Definir senha
+                Fazer login
               </a>
             </p>
           </div>
@@ -39,7 +33,6 @@ export default function LoginPage() {
       <div className="bg-primary/5 relative hidden flex-col items-center justify-center overflow-hidden p-12 lg:flex">
         <div className="from-primary/20 pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent" />
         <div className="relative z-10 max-w-lg space-y-6 text-center">
-          {/* Placeholder for Logo or Illustration */}
           <div className="bg-primary mx-auto flex h-24 w-24 rotate-3 transform items-center justify-center rounded-xl shadow-lg">
             <span className="text-xl font-bold text-white">TechLub</span>
           </div>

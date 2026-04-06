@@ -28,6 +28,7 @@ const ROUTE_LABELS: Record<string, string> = {
   configuracoes: "Configurações",
   materiais: "Materiais",
   "ordens-servico": "Ordens de Serviço",
+  usuarios: "Usuários",
 };
 
 /** Detecta se o segmento é um UUID (v4) */
