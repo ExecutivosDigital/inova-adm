@@ -6,13 +6,31 @@ import { AdvancedMonthlyCalendar } from "@/components/planning-advanced/Advanced
 import { BulkProgramacaoModal } from "@/components/planning-advanced/BulkProgramacaoModal";
 import { ConfirmProgramacaoModal } from "@/components/planning-advanced/ConfirmProgramacaoModal";
 import { ImprovedWeekView } from "@/components/planning-advanced/ImprovedWeekView";
-import { ViewWorkOrdersModal, type WorkOrderSummary } from "@/components/planning-advanced/ViewWorkOrdersModal";
-import { PlanningToolbar, type PlanningView } from "@/components/planning-advanced/PlanningToolbar";
+import {
+  PlanningToolbar,
+  type PlanningView,
+} from "@/components/planning-advanced/PlanningToolbar";
+import {
+  ViewWorkOrdersModal,
+  type WorkOrderSummary,
+} from "@/components/planning-advanced/ViewWorkOrdersModal";
 import { PlanningRoutesFiltersPanel } from "@/components/planning-routes/PlanningRoutesFiltersPanel";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useApiContext } from "@/context/ApiContext";
 import { useCompany } from "@/context/CompanyContext";
-import { combineSchedules, fetchSchedules, fetchWorkload } from "@/lib/planning-api";
-import type { AutoGenerateFilters, ScheduleItem } from "@/lib/planning-advanced-types";
+import type {
+  AutoGenerateFilters,
+  ScheduleItem,
+} from "@/lib/planning-advanced-types";
+import {
+  combineSchedules,
+  fetchSchedules,
+  fetchWorkload,
+} from "@/lib/planning-api";
 import type {
   CompanySchedule,
   FilterServicesPayload,
@@ -22,8 +40,17 @@ import type {
   ServiceScheduleItem,
   WorkloadIndicator,
 } from "@/lib/route-types";
-import { addDays, addMonths, addWeeks, addYears, startOfDay, subDays, subMonths, subWeeks, subYears } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  startOfDay,
+  subDays,
+  subMonths,
+  subWeeks,
+  subYears,
+} from "date-fns";
 import { ChevronDown, ClipboardList, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -32,7 +59,10 @@ import toast from "react-hot-toast";
  * Indica se o agendamento gera ordem de serviço (rota com serviços ou serviço avulso).
  * Rota: 1 WO única com todos os serviços. Serviço avulso: 1 WO.
  */
-function scheduleHasWorkOrder(schedule: ScheduleItem, routeCipServices: RouteCipServiceItem[]): boolean {
+function scheduleHasWorkOrder(
+  schedule: ScheduleItem,
+  routeCipServices: RouteCipServiceItem[],
+): boolean {
   if (schedule.type === "route" && schedule.routeId) {
     return routeCipServices.some((rcs) => rcs.routeId === schedule.routeId);
   }
@@ -43,7 +73,7 @@ function scheduleHasWorkOrder(schedule: ScheduleItem, routeCipServices: RouteCip
 function buildSingleServicePayload(
   schedule: ScheduleItem,
   visibilityMode: "all_with_team_role" | "assigned_workers",
-  workerIds?: string[]
+  workerIds?: string[],
 ) {
   if (schedule.type !== "service" || !schedule.serviceId) return null;
   return {
@@ -61,31 +91,53 @@ export function ProgramacaoCalendarContainer() {
   const [viewMode, setViewMode] = useState<PlanningView>("week");
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
   const [routeSchedules, setRouteSchedules] = useState<RouteScheduleItem[]>([]);
-  const [serviceSchedules, setServiceSchedules] = useState<ServiceScheduleItem[]>([]);
+  const [serviceSchedules, setServiceSchedules] = useState<
+    ServiceScheduleItem[]
+  >([]);
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [services, setServices] = useState<import("@/lib/route-types").CipService[]>([]);
-  const [routeCipServices, setRouteCipServices] = useState<RouteCipServiceItem[]>([]);
-  const [companySchedule, setCompanySchedule] = useState<CompanySchedule | null>(null);
-  const [workloadIndicators, setWorkloadIndicators] = useState<WorkloadIndicator[]>([]);
-  const [yearWorkloadSummaries, setYearWorkloadSummaries] = useState<
-    Array<{ scheduledHours: number; availableHours: number; utilization: number; status: "low" | "medium" | "high" }> | null
-  >(null);
+  const [services, setServices] = useState<
+    import("@/lib/route-types").CipService[]
+  >([]);
+  const [routeCipServices, setRouteCipServices] = useState<
+    RouteCipServiceItem[]
+  >([]);
+  const [companySchedule, setCompanySchedule] =
+    useState<CompanySchedule | null>(null);
+  const [workloadIndicators, setWorkloadIndicators] = useState<
+    WorkloadIndicator[]
+  >([]);
+  const [yearWorkloadSummaries, setYearWorkloadSummaries] = useState<Array<{
+    scheduledHours: number;
+    availableHours: number;
+    utilization: number;
+    status: "low" | "medium" | "high";
+  }> | null>(null);
   const [loadingYearWorkload, setLoadingYearWorkload] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [scheduleToConfirm, setScheduleToConfirm] = useState<ScheduleItem | null>(null);
+  const [scheduleToConfirm, setScheduleToConfirm] =
+    useState<ScheduleItem | null>(null);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [emitting, setEmitting] = useState(false);
   const [workOrders, setWorkOrders] = useState<WorkOrderSummary[]>([]);
-  const [selectedWorkOrdersToView, setSelectedWorkOrdersToView] = useState<WorkOrderSummary[] | null>(null);
+  const [selectedWorkOrdersToView, setSelectedWorkOrdersToView] = useState<
+    WorkOrderSummary[] | null
+  >(null);
   const [filters, setFilters] = useState<FilterServicesPayload>({});
-  const [filteredCipServiceIds, setFilteredCipServiceIds] = useState<Set<string> | null>(null);
+  const [filteredCipServiceIds, setFilteredCipServiceIds] =
+    useState<Set<string> | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [workers, setWorkers] = useState<Array<{ id: string; name: string; workerRoles?: Array<{ id: string; name: string }> }>>([]);
+  const [workers, setWorkers] = useState<
+    Array<{
+      id: string;
+      name: string;
+      workerRoles?: Array<{ id: string; name: string }>;
+    }>
+  >([]);
 
   const schedules = useMemo(
     () => combineSchedules(routeSchedules, serviceSchedules),
-    [routeSchedules, serviceSchedules]
+    [routeSchedules, serviceSchedules],
   );
 
   const fetchData = useCallback(async () => {
@@ -102,14 +154,37 @@ export function ProgramacaoCalendarContainer() {
     }
     setLoading(true);
     try {
-      const [schedulesResult, companyRes, routesRes, servicesRes, routeServicesRes, workOrdersRes, workersRes] = await Promise.all([
+      const [
+        schedulesResult,
+        companyRes,
+        routesRes,
+        servicesRes,
+        routeServicesRes,
+        workOrdersRes,
+        workersRes,
+      ] = await Promise.all([
         fetchSchedules(effectiveCompanyId, apiContext),
         apiContext.GetAPI(`/company/${effectiveCompanyId}`, true),
-        apiContext.GetAPI(isSuperAdmin ? `/route?companyId=${effectiveCompanyId}` : "/route", true),
-        apiContext.PostAPI(`/filter-services`, { companyId: effectiveCompanyId }, true),
-        apiContext.GetAPI(`/route/company/${effectiveCompanyId}/route-services`, true),
+        apiContext.GetAPI(
+          isSuperAdmin ? `/route?companyId=${effectiveCompanyId}` : "/route",
+          true,
+        ),
+        apiContext.PostAPI(
+          `/filter-services`,
+          { companyId: effectiveCompanyId },
+          true,
+        ),
+        apiContext.GetAPI(
+          `/route/company/${effectiveCompanyId}/route-services`,
+          true,
+        ),
         apiContext.GetAPI(`/work-order/company/${effectiveCompanyId}`, true),
-        apiContext.GetAPI(isSuperAdmin ? `/workers?companyId=${effectiveCompanyId}` : "/workers", true),
+        apiContext.GetAPI(
+          isSuperAdmin
+            ? `/workers?companyId=${effectiveCompanyId}`
+            : "/workers",
+          true,
+        ),
       ]);
       setRouteSchedules(schedulesResult.routeSchedules);
       setServiceSchedules(schedulesResult.serviceSchedules);
@@ -117,24 +192,45 @@ export function ProgramacaoCalendarContainer() {
         setCompanySchedule(companyRes.body as CompanySchedule);
       }
       if (routesRes.status === 200 && routesRes.body?.routes) {
-        setRoutes((routesRes.body.routes as Route[]).filter((r) => !r.isTemporary));
+        setRoutes(
+          (routesRes.body.routes as Route[]).filter((r) => !r.isTemporary),
+        );
       }
       if (servicesRes.status === 200 && servicesRes.body?.cipServices) {
-        setServices(servicesRes.body.cipServices as import("@/lib/route-types").CipService[]);
+        setServices(
+          servicesRes.body
+            .cipServices as import("@/lib/route-types").CipService[],
+        );
       }
-      if (routeServicesRes.status === 200 && routeServicesRes.body?.routeCipServices) {
-        setRouteCipServices(routeServicesRes.body.routeCipServices as RouteCipServiceItem[]);
+      if (
+        routeServicesRes.status === 200 &&
+        routeServicesRes.body?.routeCipServices
+      ) {
+        setRouteCipServices(
+          routeServicesRes.body.routeCipServices as RouteCipServiceItem[],
+        );
       }
       if (workOrdersRes.status === 200 && workOrdersRes.body?.workOrders) {
         setWorkOrders(workOrdersRes.body.workOrders as WorkOrderSummary[]);
       }
       if (workersRes.status === 200 && workersRes.body?.workers) {
-        setWorkers(workersRes.body.workers as Array<{ id: string; name: string; workerRoles?: Array<{ id: string; name: string }> }>);
+        setWorkers(
+          workersRes.body.workers as Array<{
+            id: string;
+            name: string;
+            workerRoles?: Array<{ id: string; name: string }>;
+          }>,
+        );
       }
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       try {
-        const workloadResult = await fetchWorkload(effectiveCompanyId, year, month, apiContext);
+        const workloadResult = await fetchWorkload(
+          effectiveCompanyId,
+          year,
+          month,
+          apiContext,
+        );
         setWorkloadIndicators(workloadResult.indicators);
       } catch {
         setWorkloadIndicators([]);
@@ -168,17 +264,24 @@ export function ProgramacaoCalendarContainer() {
     setLoadingYearWorkload(true);
     Promise.all(
       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((month) =>
-        fetchWorkload(effectiveCompanyId, year, month, apiContext)
-      )
+        fetchWorkload(effectiveCompanyId, year, month, apiContext),
+      ),
     )
       .then((results) => {
         const summaries = results.map((r) => {
           const indicators = r.indicators;
-          const scheduledHours = indicators.reduce((s, i) => s + i.scheduledHours, 0);
-          const availableHours = indicators.reduce((s, i) => s + i.availableHours, 0);
+          const scheduledHours = indicators.reduce(
+            (s, i) => s + i.scheduledHours,
+            0,
+          );
+          const availableHours = indicators.reduce(
+            (s, i) => s + i.availableHours,
+            0,
+          );
           const utilization =
             indicators.length > 0
-              ? indicators.reduce((s, i) => s + i.utilization, 0) / indicators.length
+              ? indicators.reduce((s, i) => s + i.utilization, 0) /
+                indicators.length
               : 0;
           const status: "low" | "medium" | "high" =
             utilization > 95 ? "high" : utilization >= 80 ? "medium" : "low";
@@ -192,7 +295,10 @@ export function ProgramacaoCalendarContainer() {
 
   const scheduleCountsByMonth = useMemo(() => {
     const year = currentDate.getFullYear();
-    const counts = Array.from({ length: 12 }, () => ({ routeCount: 0, serviceCount: 0 }));
+    const counts = Array.from({ length: 12 }, () => ({
+      routeCount: 0,
+      serviceCount: 0,
+    }));
     for (const s of schedules) {
       const d = new Date(s.scheduledStartAt);
       if (Number.isNaN(d.getTime()) || d.getFullYear() !== year) continue;
@@ -205,7 +311,8 @@ export function ProgramacaoCalendarContainer() {
 
   // Meses sem planejamento (0 rotas e 0 serviços) ficam null → azul na visão anual.
   const monthlySummariesForYear = useMemo(() => {
-    if (!yearWorkloadSummaries || yearWorkloadSummaries.length !== 12) return null;
+    if (!yearWorkloadSummaries || yearWorkloadSummaries.length !== 12)
+      return null;
     return yearWorkloadSummaries.map((w, i) => {
       const routeCount = scheduleCountsByMonth[i].routeCount;
       const serviceCount = scheduleCountsByMonth[i].serviceCount;
@@ -219,26 +326,46 @@ export function ProgramacaoCalendarContainer() {
     });
   }, [yearWorkloadSummaries, scheduleCountsByMonth]);
 
-  const handleNavigate = useCallback((action: "prev" | "next" | "today") => {
-    if (action === "today") {
-      setCurrentDate(startOfDay(new Date()));
-      return;
-    }
-    if (viewMode === "year") {
-      setCurrentDate(action === "prev" ? subYears(currentDate, 1) : addYears(currentDate, 1));
-    } else if (viewMode === "month") {
-      setCurrentDate(action === "prev" ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
-    } else if (viewMode === "week") {
-      setCurrentDate(action === "prev" ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(action === "prev" ? subDays(currentDate, 1) : addDays(currentDate, 1));
-    }
-  }, [viewMode, currentDate]);
+  const handleNavigate = useCallback(
+    (action: "prev" | "next" | "today") => {
+      if (action === "today") {
+        setCurrentDate(startOfDay(new Date()));
+        return;
+      }
+      if (viewMode === "year") {
+        setCurrentDate(
+          action === "prev"
+            ? subYears(currentDate, 1)
+            : addYears(currentDate, 1),
+        );
+      } else if (viewMode === "month") {
+        setCurrentDate(
+          action === "prev"
+            ? subMonths(currentDate, 1)
+            : addMonths(currentDate, 1),
+        );
+      } else if (viewMode === "week") {
+        setCurrentDate(
+          action === "prev"
+            ? subWeeks(currentDate, 1)
+            : addWeeks(currentDate, 1),
+        );
+      } else {
+        setCurrentDate(
+          action === "prev" ? subDays(currentDate, 1) : addDays(currentDate, 1),
+        );
+      }
+    },
+    [viewMode, currentDate],
+  );
 
-  const handleViewChange = useCallback((newView: PlanningView) => {
-    if (newView === "day") setCurrentDate(startOfDay(currentDate));
-    setViewMode(newView);
-  }, [currentDate]);
+  const handleViewChange = useCallback(
+    (newView: PlanningView) => {
+      if (newView === "day") setCurrentDate(startOfDay(currentDate));
+      setViewMode(newView);
+    },
+    [currentDate],
+  );
 
   const routeDurationByRouteId = useMemo(() => {
     const map = new Map<string, number>();
@@ -257,7 +384,7 @@ export function ProgramacaoCalendarContainer() {
         name: route.name,
         duration: routeDurationByRouteId.get(route.id) ?? 120,
       })),
-    [routes, routeDurationByRouteId]
+    [routes, routeDurationByRouteId],
   );
 
   const planningServices = useMemo(
@@ -273,12 +400,15 @@ export function ProgramacaoCalendarContainer() {
         periodDays: service.period?.days || undefined,
         lastExecutionDate: undefined,
       })),
-    [services]
+    [services],
   );
 
   const scheduleItems = useMemo(() => {
-    const items = schedules.map((schedule) => {
-      const raw = schedule as { assignedWorkerIds?: string[]; assignedWorkers?: Array<{ id: string; name: string }> };
+    const items: ScheduleItem[] = schedules.map((schedule) => {
+      const raw = schedule as {
+        assignedWorkerIds?: string[];
+        assignedWorkers?: Array<{ id: string; name: string }>;
+      };
       const base = {
         assignedWorkerIds: raw.assignedWorkerIds ?? [],
         assignedWorkers: raw.assignedWorkers ?? [],
@@ -337,7 +467,9 @@ export function ProgramacaoCalendarContainer() {
       }
     }
     for (const [, group] of splitGroupMap) {
-      group.sort((a, b) => a.scheduledStartAt.localeCompare(b.scheduledStartAt));
+      group.sort((a, b) =>
+        a.scheduledStartAt.localeCompare(b.scheduledStartAt),
+      );
       group.forEach((item, idx) => {
         item.splitPartIndex = idx + 1;
         item.splitTotalParts = group.length;
@@ -349,73 +481,141 @@ export function ProgramacaoCalendarContainer() {
 
   const activeFiltersCount = useMemo(() => {
     const keys: (keyof FilterServicesPayload)[] = [
-      "periodIds", "priorityIds", "teamIds", "serviceConditionIds",
-      "jobSystemIds", "executionTimeIds", "extraTeamIds",
-      "estimatedExtraTeamTimeIds", "serviceModelIds", "epiIds",
-      "toolkitIds", "sectorIds", "equipmentTypeIds", "manufacturerIds",
-      "costCenterIds", "safetyConditionIds", "lubricationSystemIds",
-      "mainComponentIds", "powerUnitIds",
+      "periodIds",
+      "priorityIds",
+      "teamIds",
+      "serviceConditionIds",
+      "jobSystemIds",
+      "executionTimeIds",
+      "extraTeamIds",
+      "estimatedExtraTeamTimeIds",
+      "serviceModelIds",
+      "epiIds",
+      "toolkitIds",
+      "sectorIds",
+      "equipmentTypeIds",
+      "manufacturerIds",
+      "costCenterIds",
+      "safetyConditionIds",
+      "lubricationSystemIds",
+      "mainComponentIds",
+      "powerUnitIds",
     ];
-    return keys.filter((k) => (filters[k] as string[] | undefined)?.length).length;
+    return keys.filter((k) => (filters[k] as string[] | undefined)?.length)
+      .length;
   }, [filters]);
 
-  const handleApplyFilters = useCallback(async (newFilters: FilterServicesPayload) => {
-    console.log("[filters] handleApplyFilters called with:", newFilters);
-    setFilters(newFilters);
-    const hasActive = Object.values(newFilters).some(v => Array.isArray(v) && v.length > 0);
-    if (!hasActive || !effectiveCompanyId) {
-      console.log("[filters] clearing filteredCipServiceIds (no active filters)");
-      setFilteredCipServiceIds(null);
-      return;
-    }
-    try {
-      const allIds: string[] = [];
-      let page = 1;
-      let hasMore = true;
-      while (hasMore) {
-        const res = await apiContext.PostAPI("/filter-services", {
-          ...newFilters,
-          companyId: effectiveCompanyId,
-          limit: 100,
-          page,
-        }, true);
-        console.log("[filters] page", page, "status:", res.status, "count:", (res.body?.cipServices as unknown[])?.length ?? 0, "total:", res.body?.total);
-        if (res.status === 200 && res.body?.cipServices) {
-          const batch = (res.body.cipServices as Array<{ id: string }>).map(s => s.id);
-          allIds.push(...batch);
-          const total = typeof res.body.total === "number" ? res.body.total : 0;
-          hasMore = allIds.length < total;
-          page += 1;
-        } else {
-          hasMore = false;
-        }
+  const handleApplyFilters = useCallback(
+    async (newFilters: FilterServicesPayload) => {
+      console.log("[filters] handleApplyFilters called with:", newFilters);
+      setFilters(newFilters);
+      const hasActive = Object.values(newFilters).some(
+        (v) => Array.isArray(v) && v.length > 0,
+      );
+      if (!hasActive || !effectiveCompanyId) {
+        console.log(
+          "[filters] clearing filteredCipServiceIds (no active filters)",
+        );
+        setFilteredCipServiceIds(null);
+        return;
       }
-      console.log("[filters] total matched cipService IDs:", allIds.length);
-      setFilteredCipServiceIds(new Set(allIds));
-    } catch (err) {
-      console.error("[filters] error calling /filter-services:", err);
-      setFilteredCipServiceIds(null);
-    }
-  }, [effectiveCompanyId, apiContext]);
+      try {
+        const allIds: string[] = [];
+        let page = 1;
+        let hasMore = true;
+        while (hasMore) {
+          const res = await apiContext.PostAPI(
+            "/filter-services",
+            {
+              ...newFilters,
+              companyId: effectiveCompanyId,
+              limit: 100,
+              page,
+            },
+            true,
+          );
+          console.log(
+            "[filters] page",
+            page,
+            "status:",
+            res.status,
+            "count:",
+            (res.body?.cipServices as unknown[])?.length ?? 0,
+            "total:",
+            res.body?.total,
+          );
+          if (res.status === 200 && res.body?.cipServices) {
+            const batch = (res.body.cipServices as Array<{ id: string }>).map(
+              (s) => s.id,
+            );
+            allIds.push(...batch);
+            const total =
+              typeof res.body.total === "number" ? res.body.total : 0;
+            hasMore = allIds.length < total;
+            page += 1;
+          } else {
+            hasMore = false;
+          }
+        }
+        console.log("[filters] total matched cipService IDs:", allIds.length);
+        setFilteredCipServiceIds(new Set(allIds));
+      } catch (err) {
+        console.error("[filters] error calling /filter-services:", err);
+        setFilteredCipServiceIds(null);
+      }
+    },
+    [effectiveCompanyId, apiContext],
+  );
 
   const filteredScheduleItems = useMemo(() => {
-    console.log("[filters] computing filteredScheduleItems. filteredCipServiceIds:", filteredCipServiceIds ? `Set(${filteredCipServiceIds.size})` : "null", "scheduleItems:", scheduleItems.length, "routeCipServices:", routeCipServices.length);
+    console.log(
+      "[filters] computing filteredScheduleItems. filteredCipServiceIds:",
+      filteredCipServiceIds ? `Set(${filteredCipServiceIds.size})` : "null",
+      "scheduleItems:",
+      scheduleItems.length,
+      "routeCipServices:",
+      routeCipServices.length,
+    );
     if (!filteredCipServiceIds) return scheduleItems;
-    const result = scheduleItems.filter(item => {
+    const result = scheduleItems.filter((item) => {
       if (item.type === "service" && item.serviceId) {
         const match = filteredCipServiceIds.has(item.serviceId);
-        if (!match) console.log("[filters] excluding service schedule", item.id, "serviceId:", item.serviceId);
+        if (!match)
+          console.log(
+            "[filters] excluding service schedule",
+            item.id,
+            "serviceId:",
+            item.serviceId,
+          );
         return match;
       }
       if (item.type === "route" && item.routeId) {
-        const rcsForRoute = routeCipServices.filter(rcs => rcs.routeId === item.routeId);
-        const match = rcsForRoute.some(rcs => filteredCipServiceIds.has(rcs.cipServiceId));
-        console.log("[filters] route", item.routeId, "has", rcsForRoute.length, "cipServices, match:", match, "cipServiceIds:", rcsForRoute.map(r => r.cipServiceId));
+        const rcsForRoute = routeCipServices.filter(
+          (rcs) => rcs.routeId === item.routeId,
+        );
+        const match = rcsForRoute.some((rcs) =>
+          filteredCipServiceIds.has(rcs.cipServiceId),
+        );
+        console.log(
+          "[filters] route",
+          item.routeId,
+          "has",
+          rcsForRoute.length,
+          "cipServices, match:",
+          match,
+          "cipServiceIds:",
+          rcsForRoute.map((r) => r.cipServiceId),
+        );
         return match;
       }
       return true;
     });
-    console.log("[filters] filtered result:", result.length, "of", scheduleItems.length);
+    console.log(
+      "[filters] filtered result:",
+      result.length,
+      "of",
+      scheduleItems.length,
+    );
     return result;
   }, [scheduleItems, filteredCipServiceIds, routeCipServices]);
 
@@ -425,11 +625,19 @@ export function ProgramacaoCalendarContainer() {
 
   const handleConfirmProgramar = useCallback(
     async (schedule: ScheduleItem) => {
-      const visibilityMode = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role";
-      const workerIds = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? schedule.assignedWorkerIds : undefined;
+      const visibilityMode =
+        (schedule.assignedWorkerIds?.length ?? 0) > 0
+          ? "assigned_workers"
+          : "all_with_team_role";
+      const workerIds =
+        (schedule.assignedWorkerIds?.length ?? 0) > 0
+          ? schedule.assignedWorkerIds
+          : undefined;
       if (schedule.type === "route" && schedule.routeId) {
         if (!scheduleHasWorkOrder(schedule, routeCipServices)) {
-          toast.error("Nenhuma ordem de serviço a emitir para esta rota (sem serviços vinculados).");
+          toast.error(
+            "Nenhuma ordem de serviço a emitir para esta rota (sem serviços vinculados).",
+          );
           return;
         }
         setEmitting(true);
@@ -442,10 +650,13 @@ export function ProgramacaoCalendarContainer() {
               visibilityMode,
               ...(workerIds?.length ? { workerIds } : {}),
             },
-            true
+            true,
           );
           if (res.status !== 200 && res.status !== 201) {
-            toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordem de serviço.");
+            toast.error(
+              (res.body as { message?: string })?.message ??
+                "Erro ao emitir ordem de serviço.",
+            );
             return;
           }
           setScheduleToConfirm(null);
@@ -459,16 +670,27 @@ export function ProgramacaoCalendarContainer() {
         }
         return;
       }
-      const payloadSingle = buildSingleServicePayload(schedule, visibilityMode, workerIds);
+      const payloadSingle = buildSingleServicePayload(
+        schedule,
+        visibilityMode,
+        workerIds,
+      );
       if (!payloadSingle) {
         toast.error("Nenhuma ordem de serviço a emitir para este item.");
         return;
       }
       setEmitting(true);
       try {
-        const res = await apiContext.PostAPI("/work-order/single", payloadSingle, true);
+        const res = await apiContext.PostAPI(
+          "/work-order/single",
+          payloadSingle,
+          true,
+        );
         if (res.status !== 200 && res.status !== 201) {
-          toast.error((res.body as { message?: string })?.message ?? "Erro ao emitir ordem de serviço.");
+          toast.error(
+            (res.body as { message?: string })?.message ??
+              "Erro ao emitir ordem de serviço.",
+          );
           return;
         }
         setScheduleToConfirm(null);
@@ -481,12 +703,15 @@ export function ProgramacaoCalendarContainer() {
         setEmitting(false);
       }
     },
-    [routeCipServices, apiContext, fetchData]
+    [routeCipServices, apiContext, fetchData],
   );
 
   const noop = useCallback(() => {}, []);
 
-  function sameScheduleTime(woScheduledAt: string | null, scheduleStart: string): boolean {
+  function sameScheduleTime(
+    woScheduledAt: string | null,
+    scheduleStart: string,
+  ): boolean {
     if (!woScheduledAt) return false;
     const a = Math.floor(new Date(woScheduledAt).getTime() / 60000);
     const b = Math.floor(new Date(scheduleStart).getTime() / 60000);
@@ -497,14 +722,19 @@ export function ProgramacaoCalendarContainer() {
     const map = new Map<string, WorkOrderSummary[]>();
     for (const schedule of scheduleItems) {
       const matched = workOrders.filter((wo) => {
-        if (!sameScheduleTime(wo.scheduledAt ?? null, schedule.scheduledStartAt)) return false;
+        if (
+          !sameScheduleTime(wo.scheduledAt ?? null, schedule.scheduledStartAt)
+        )
+          return false;
         if (schedule.type === "route" && schedule.routeId) {
           return wo.routeId === schedule.routeId;
         }
         if (schedule.type === "service" && schedule.serviceId) {
           return (
             wo.cipServiceId === schedule.serviceId ||
-            wo.cipServices?.some((s) => (s as { id?: string }).id === schedule.serviceId)
+            wo.cipServices?.some(
+              (s) => (s as { id?: string }).id === schedule.serviceId,
+            )
           );
         }
         return false;
@@ -519,18 +749,27 @@ export function ProgramacaoCalendarContainer() {
     const set = new Set<string>();
     for (const schedule of scheduleItems) {
       const matched = workOrdersByScheduleId.get(schedule.id) ?? [];
-      if (scheduleHasWorkOrder(schedule, routeCipServices) && matched.length >= 1) set.add(schedule.id);
+      if (
+        scheduleHasWorkOrder(schedule, routeCipServices) &&
+        matched.length >= 1
+      )
+        set.add(schedule.id);
     }
     return set;
   }, [scheduleItems, routeCipServices, workOrdersByScheduleId]);
 
   const getWOCountForSchedule = useCallback(
-    (schedule: ScheduleItem) => (scheduleHasWorkOrder(schedule, routeCipServices) ? 1 : 0),
-    [routeCipServices]
+    (schedule: ScheduleItem) =>
+      scheduleHasWorkOrder(schedule, routeCipServices) ? 1 : 0,
+    [routeCipServices],
   );
 
   const handleBulkConfirm = useCallback(
-    async (startDate: string, endDate: string, _filters?: AutoGenerateFilters) => {
+    async (
+      startDate: string,
+      endDate: string,
+      _filters?: AutoGenerateFilters,
+    ) => {
       const start = new Date(startDate).getTime();
       const end = new Date(endDate + "T23:59:59.999Z").getTime();
       const routeSchedulesInRange: ScheduleItem[] = [];
@@ -551,18 +790,34 @@ export function ProgramacaoCalendarContainer() {
           if (seenSplitGroups.has(schedule.splitGroupId)) continue;
           seenSplitGroups.add(schedule.splitGroupId);
         }
-        const visibilityMode = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role";
-        const workerIds = (schedule.assignedWorkerIds?.length ?? 0) > 0 ? schedule.assignedWorkerIds : undefined;
-        if (schedule.type === "route" && schedule.routeId && scheduleHasWorkOrder(schedule, routeCipServices)) {
+        const visibilityMode =
+          (schedule.assignedWorkerIds?.length ?? 0) > 0
+            ? "assigned_workers"
+            : "all_with_team_role";
+        const workerIds =
+          (schedule.assignedWorkerIds?.length ?? 0) > 0
+            ? schedule.assignedWorkerIds
+            : undefined;
+        if (
+          schedule.type === "route" &&
+          schedule.routeId &&
+          scheduleHasWorkOrder(schedule, routeCipServices)
+        ) {
           routeSchedulesInRange.push(schedule);
         } else {
-          const payload = buildSingleServicePayload(schedule, visibilityMode, workerIds);
+          const payload = buildSingleServicePayload(
+            schedule,
+            visibilityMode,
+            workerIds,
+          );
           if (payload) servicePayloads.push(payload);
         }
       }
       const total = routeSchedulesInRange.length + servicePayloads.length;
       if (total === 0) {
-        toast.error("Nenhum agendamento pendente no período selecionado (todos já possuem ordem de serviço ou período vazio).");
+        toast.error(
+          "Nenhum agendamento pendente no período selecionado (todos já possuem ordem de serviço ou período vazio).",
+        );
         return;
       }
       setEmitting(true);
@@ -574,24 +829,43 @@ export function ProgramacaoCalendarContainer() {
           const routePayloads = routeSchedulesInRange.map((schedule) => ({
             routeId: schedule.routeId!,
             scheduledAt: schedule.scheduledStartAt,
-            visibilityMode: ((schedule.assignedWorkerIds?.length ?? 0) > 0 ? "assigned_workers" : "all_with_team_role") as "all_with_team_role" | "assigned_workers",
-            ...((schedule.assignedWorkerIds?.length ?? 0) > 0 ? { workerIds: schedule.assignedWorkerIds } : {}),
+            visibilityMode: ((schedule.assignedWorkerIds?.length ?? 0) > 0
+              ? "assigned_workers"
+              : "all_with_team_role") as
+              | "all_with_team_role"
+              | "assigned_workers",
+            ...((schedule.assignedWorkerIds?.length ?? 0) > 0
+              ? { workerIds: schedule.assignedWorkerIds }
+              : {}),
           }));
           promises.push(
-            apiContext.PostAPI("/work-order/route/multi", { routes: routePayloads }, true)
+            apiContext.PostAPI(
+              "/work-order/route/multi",
+              { routes: routePayloads },
+              true,
+            ),
           );
         }
 
         if (servicePayloads.length > 0) {
           promises.push(
-            apiContext.PostAPI("/work-order/multi", { workOrders: servicePayloads }, true)
+            apiContext.PostAPI(
+              "/work-order/multi",
+              { workOrders: servicePayloads },
+              true,
+            ),
           );
         }
 
         const results = await Promise.all(promises);
-        const failed = results.find((r) => r.status !== 200 && r.status !== 201);
+        const failed = results.find(
+          (r) => r.status !== 200 && r.status !== 201,
+        );
         if (failed) {
-          toast.error((failed.body as { message?: string })?.message ?? "Erro ao emitir ordens de serviço.");
+          toast.error(
+            (failed.body as { message?: string })?.message ??
+              "Erro ao emitir ordens de serviço.",
+          );
           return;
         }
 
@@ -605,16 +879,17 @@ export function ProgramacaoCalendarContainer() {
         setEmitting(false);
       }
     },
-    [scheduleItems, routeCipServices, scheduleIdsWithOS, apiContext, fetchData]
+    [scheduleItems, routeCipServices, scheduleIdsWithOS, apiContext, fetchData],
   );
 
   const workOrdersForSchedule = useCallback(
     (schedule: ScheduleItem) => workOrdersByScheduleId.get(schedule.id) ?? [],
-    [workOrdersByScheduleId]
+    [workOrdersByScheduleId],
   );
 
   const { workerRoleCapacity, totalAvailableHoursPerDay } = useMemo(() => {
-    if (!companySchedule) return { workerRoleCapacity: [], totalAvailableHoursPerDay: 0 };
+    if (!companySchedule)
+      return { workerRoleCapacity: [], totalAvailableHoursPerDay: 0 };
     const cs = companySchedule;
     const toMin = (hhmm: string | null) => {
       if (!hhmm) return 0;
@@ -628,23 +903,37 @@ export function ProgramacaoCalendarContainer() {
       lunchMin = toMin(cs.lunchBreakEnd) - toMin(cs.lunchBreakStart);
       if (lunchMin < 0) lunchMin = 0;
     }
-    const hoursPerWorkerPerDay = Math.max(0, (endMin - startMin - lunchMin) / 60);
+    const hoursPerWorkerPerDay = Math.max(
+      0,
+      (endMin - startMin - lunchMin) / 60,
+    );
 
     const total = Math.round(workers.length * hoursPerWorkerPerDay * 100) / 100;
 
-    const roleMap = new Map<string, { name: string; workerCount: number; hours: number }>();
+    const roleMap = new Map<
+      string,
+      { name: string; workerCount: number; hours: number }
+    >();
     for (const w of workers) {
       const roles = w.workerRoles ?? [];
       if (roles.length === 0) {
         const key = "__sem_funcao__";
-        const entry = roleMap.get(key) ?? { name: "Sem função", workerCount: 0, hours: 0 };
+        const entry = roleMap.get(key) ?? {
+          name: "Sem função",
+          workerCount: 0,
+          hours: 0,
+        };
         entry.workerCount += 1;
         entry.hours += hoursPerWorkerPerDay;
         roleMap.set(key, entry);
       } else {
         const hoursPerRole = hoursPerWorkerPerDay / roles.length;
         for (const role of roles) {
-          const entry = roleMap.get(role.id) ?? { name: role.name, workerCount: 0, hours: 0 };
+          const entry = roleMap.get(role.id) ?? {
+            name: role.name,
+            workerCount: 0,
+            hours: 0,
+          };
           entry.workerCount += 1;
           entry.hours += hoursPerRole;
           roleMap.set(role.id, entry);
@@ -652,10 +941,14 @@ export function ProgramacaoCalendarContainer() {
       }
     }
 
-    const capacity = Array.from(roleMap.entries()).map(([id, { name, workerCount, hours }]) => ({
-      id, name, workerCount,
-      hoursPerDay: Math.round(hours * 100) / 100,
-    }));
+    const capacity = Array.from(roleMap.entries()).map(
+      ([id, { name, workerCount, hours }]) => ({
+        id,
+        name,
+        workerCount,
+        hoursPerDay: Math.round(hours * 100) / 100,
+      }),
+    );
 
     return { workerRoleCapacity: capacity, totalAvailableHoursPerDay: total };
   }, [workers, companySchedule]);
@@ -663,13 +956,22 @@ export function ProgramacaoCalendarContainer() {
   const cipServiceRoleMap = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const ss of serviceSchedules) {
-      const roles = (ss.cipService as { team?: { teamWorkerRoles?: Array<{ workerRole?: { id: string } }> } })
-        ?.team?.teamWorkerRoles?.map(twr => twr.workerRole?.id).filter((id): id is string => !!id) ?? [];
+      const roles =
+        (
+          ss.cipService as {
+            team?: { teamWorkerRoles?: Array<{ workerRole?: { id: string } }> };
+          }
+        )?.team?.teamWorkerRoles
+          ?.map((twr) => twr.workerRole?.id)
+          .filter((id): id is string => !!id) ?? [];
       if (roles.length > 0) map.set(ss.cipServiceId, roles);
     }
     for (const s of services) {
       if (!map.has(s.id)) {
-        const roles = s.team?.teamWorkerRoles?.map(twr => twr.workerRole?.id).filter((id): id is string => !!id) ?? [];
+        const roles =
+          s.team?.teamWorkerRoles
+            ?.map((twr) => twr.workerRole?.id)
+            .filter((id): id is string => !!id) ?? [];
         if (roles.length > 0) map.set(s.id, roles);
       }
     }
@@ -691,13 +993,17 @@ export function ProgramacaoCalendarContainer() {
   if (!companySchedule) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-slate-500">Configurações da empresa não encontradas.</div>
+        <div className="text-slate-500">
+          Configurações da empresa não encontradas.
+        </div>
       </div>
     );
   }
 
   const companyScheduleFormatted = {
-    workDays: companySchedule.workDays ? (JSON.parse(companySchedule.workDays) as number[]) : [1, 2, 3, 4, 5],
+    workDays: companySchedule.workDays
+      ? (JSON.parse(companySchedule.workDays) as number[])
+      : [1, 2, 3, 4, 5],
     businessHoursStart: companySchedule.businessHoursStart || "08:00",
     businessHoursEnd: companySchedule.businessHoursEnd || "18:00",
     lunchBreakStart: companySchedule.lunchBreakStart ?? undefined,
@@ -721,13 +1027,13 @@ export function ProgramacaoCalendarContainer() {
               className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-sm font-medium sm:px-3 ${
                 activeFiltersCount > 0
                   ? "border-primary bg-primary/5 text-primary"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
               }`}
             >
               <SlidersHorizontal className="h-4 w-4" />
               Filtros
               {activeFiltersCount > 0 && (
-                <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-white">
+                <span className="bg-primary ml-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold text-white">
                   {activeFiltersCount}
                 </span>
               )}
@@ -736,7 +1042,7 @@ export function ProgramacaoCalendarContainer() {
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 sm:px-3"
+                  className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-50 sm:px-3"
                   aria-label="Ações do calendário"
                 >
                   Ações
@@ -752,7 +1058,7 @@ export function ProgramacaoCalendarContainer() {
                   }}
                   className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-100"
                 >
-                  <ClipboardList className="h-4 w-4 text-primary" />
+                  <ClipboardList className="text-primary h-4 w-4" />
                   Emitir Ordens de Serviço em Lote
                 </button>
               </PopoverContent>
@@ -841,7 +1147,11 @@ export function ProgramacaoCalendarContainer() {
         open={scheduleToConfirm != null}
         onClose={() => setScheduleToConfirm(null)}
         schedule={scheduleToConfirm}
-        onConfirm={() => (scheduleToConfirm ? handleConfirmProgramar(scheduleToConfirm) : undefined)}
+        onConfirm={() =>
+          scheduleToConfirm
+            ? handleConfirmProgramar(scheduleToConfirm)
+            : undefined
+        }
         loading={emitting}
       />
 
